@@ -126,6 +126,8 @@ For **local Docker**, set **`DIRECT_URL`** to the same value as **`DATABASE_URL`
 
 Set both in Netlify for **Production** (and any other context that runs migrations).
 
+The app adjusts pooled Neon URLs at runtime for Prisma on serverless (`pgbouncer=true`, `connect_timeout`, `connection_limit`) — see `src/lib/neon-db-url.ts`. You can still add these to `DATABASE_URL` in the Neon console if you prefer.
+
 ### NextAuth on previews
 
 The **GitHub Action** runs `netlify env:set … --context deploy-preview` for **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`DATABASE_URL`**, and **`DIRECT_URL`** before `netlify deploy --build`. That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without `NEXTAUTH_SECRET` there, NextAuth returns a generic “server configuration” error. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).

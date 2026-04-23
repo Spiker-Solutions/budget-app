@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
@@ -55,6 +56,35 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Registration error:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          errorResponse("An account with this email already exists"),
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        errorResponse(
+          process.env.NODE_ENV === "development"
+            ? `Database error (${error.code}): ${error.message}`
+            : "Database error. Please try again later."
+        ),
+        { status: 500 }
+      );
+    }
+
+    if (error instanceof Prisma.PrismaClientInitializationError) {
+      return NextResponse.json(
+        errorResponse(
+          process.env.NODE_ENV === "development"
+            ? `Database unavailable: ${error.message}`
+            : "Database unavailable. Please try again in a moment."
+        ),
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       errorResponse("An error occurred during registration"),
       { status: 500 }
