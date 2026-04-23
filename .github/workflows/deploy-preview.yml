@@ -65,11 +65,33 @@ jobs:
 
       - name: Deploy preview to Netlify
         id: deploy
+        env:
+          NETLIFY_SITE_SLUG: ${{ vars.NETLIFY_SITE_SLUG }}
+          NEXTAUTH_SECRET_CI: ${{ secrets.NEXTAUTH_SECRET }}
         run: |
+          set -euo pipefail
+          if [ -z "${NETLIFY_SITE_SLUG:-}" ]; then
+            echo "::error::Set repository variable NETLIFY_SITE_SLUG to your Netlify site subdomain (e.g. mrbudgets for https://mrbudgets.netlify.app). Preview URL will be https://deploy-preview-PR--SUBDOMAIN.netlify.app"
+            exit 1
+          fi
+          if [ -z "${NEXTAUTH_SECRET_CI:-}" ]; then
+            echo "::error::Set NEXTAUTH_SECRET in GitHub Actions secrets so the preview build can run (same value as Netlify production is fine)."
+            exit 1
+          fi
+
           netlify link --id "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+
+          # Start fresh: netlify env:list can emit empty NEXTAUTH_URL= which breaks NextAuth (new URL('')).
+          : > .env
           netlify env:list --context deploy-preview --plain >> .env || true
+
           echo "DIRECT_URL=${{ steps.create-branch.outputs.db_url }}" >> .env
           echo "DATABASE_URL=${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
+
+          PREVIEW_ORIGIN="https://deploy-preview-${{ github.event.number }}--${NETLIFY_SITE_SLUG}.netlify.app"
+          echo "NEXTAUTH_URL=${PREVIEW_ORIGIN}" >> .env
+          echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
+
           netlify deploy --build --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
           DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"

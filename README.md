@@ -103,9 +103,11 @@ Neon recommends a **separate Postgres branch per pull request**, with migrations
 Summary of that approach:
 
 1. In Netlify, set **Deploy previews** to **None** (so Netlify does not build PRs on its own). Production still builds from your main branch as usual.
-2. Add GitHub repository secrets (`NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_DATABASE_NAME`, `NEON_DATABASE_USERNAME`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`) as described in the guide.
-3. On each PR, `.github/workflows/deploy-preview.yml` creates a **Neon branch**, runs **`npm run db:generate-migrate`** (migrations + generate), then **`netlify deploy --build`** with that branch’s pooled and direct URLs.
-4. When the PR closes, `.github/workflows/cleanup-preview.yml` deletes the Neon preview branch.
+2. Add GitHub **repository secrets** (`NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_DATABASE_NAME`, `NEON_DATABASE_USERNAME`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`, **`NEXTAUTH_SECRET`**) as described in the guide. Previews need `NEXTAUTH_SECRET` during `netlify deploy --build` because NextAuth validates `NEXTAUTH_URL` at build time.
+
+3. Add GitHub **repository variable** **`NETLIFY_SITE_SLUG`**: your Netlify subdomain only (e.g. `mrbudgets` for `https://mrbudgets.netlify.app`). The workflow sets `NEXTAUTH_URL` to `https://deploy-preview-<PR#>--<slug>.netlify.app` so the build does not use an empty URL.
+4. On each PR, `.github/workflows/deploy-preview.yml` creates a **Neon branch**, runs **`npm run db:generate-migrate`** (migrations + generate), then **`netlify deploy --build`** with that branch’s pooled and direct URLs.
+5. When the PR closes, `.github/workflows/cleanup-preview.yml` deletes the Neon preview branch.
 
 This repo includes those workflows; enable them by adding the secrets. **Do not** point preview builds at your production `DATABASE_URL`.
 
@@ -126,7 +128,7 @@ Set both in Netlify for **Production** (and any other context that runs migratio
 
 ### NextAuth on previews
 
-OAuth needs **`NEXTAUTH_URL`** to match the preview origin. The Neon guide pulls **deploy-preview** env vars from Netlify into `.env` before `netlify deploy`; add **`NEXTAUTH_SECRET`** (and Google keys if used) to the **Deploy previews** context in Netlify. Preview URLs are still awkward for Google OAuth redirect URIs; many teams test previews with email/password only.
+The **GitHub Action** writes `NEXTAUTH_URL` and `NEXTAUTH_SECRET` into `.env` before `netlify deploy --build` (see `deploy-preview.yml`), using `NETLIFY_SITE_SLUG` and the `NEXTAUTH_SECRET` secret. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you need Google on previews, and add matching redirect URIs in Google Cloud (`https://deploy-preview-<PR#>--<slug>.netlify.app/...`). Many teams use email/password only on previews.
 
 ## Database Setup
 
