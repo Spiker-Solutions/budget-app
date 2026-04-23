@@ -71,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${NETLIFY_SITE_SLUG:-}" ]; then
-            echo "::error::Set repository variable NETLIFY_SITE_SLUG to your Netlify site subdomain (e.g. mrbudgets for https://mrbudgets.netlify.app). Preview URL will be https://deploy-preview-PR--SUBDOMAIN.netlify.app"
+            echo "::error::Set repository variable NETLIFY_SITE_SLUG to your Netlify site subdomain (e.g. mrbudgets for https://mrbudgets.netlify.app). This workflow uses netlify deploy --alias=pr-<PR#>, so the public URL is https://pr-<PR#>--<slug>.netlify.app"
             exit 1
           fi
           if [ -z "${NEXTAUTH_SECRET_CI:-}" ]; then
@@ -88,7 +88,7 @@ jobs:
           echo "DIRECT_URL=${{ steps.create-branch.outputs.db_url }}" >> .env
           echo "DATABASE_URL=${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
 
-          PREVIEW_ORIGIN="https://deploy-preview-${{ github.event.number }}--${NETLIFY_SITE_SLUG}.netlify.app"
+          PREVIEW_ORIGIN="https://pr-${{ github.event.number }}--${NETLIFY_SITE_SLUG}.netlify.app"
           echo "NEXTAUTH_URL=${PREVIEW_ORIGIN}" >> .env
           echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
 
