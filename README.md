@@ -105,7 +105,7 @@ Summary of that approach:
 1. In Netlify, set **Deploy previews** to **None** (so Netlify does not build PRs on its own). Production still builds from your main branch as usual.
 2. Add GitHub **repository secrets** (`NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_DATABASE_NAME`, `NEON_DATABASE_USERNAME`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`, **`NEXTAUTH_SECRET`**) as described in the guide. Previews need `NEXTAUTH_SECRET` during `netlify deploy --build` because NextAuth validates `NEXTAUTH_URL` at build time.
 
-3. Optional: GitHub **repository variable** **`NETLIFY_SITE_SLUG`** (subdomain only) if the Netlify API lookup fails. Otherwise the workflow reads the site name from **`GET /api/v1/sites/:site_id`** using your existing **`NETLIFY_SITE_ID`** and **`NETLIFY_AUTH_TOKEN`**. Preview origin for NextAuth: **`https://pr-<PR#>--<site-name>.netlify.app`**.
+3. Optional **`NETLIFY_SITE_SLUG`** (subdomain only, e.g. `mrbudgets`): use an Actions **variable** or **secret** with that exact name. GitHub keeps **Variables** and **Secrets** separate — the workflow uses **`vars.NETLIFY_SITE_SLUG || secrets.NETLIFY_SITE_SLUG`**. If unset, it loads the site name from the Netlify API (`NETLIFY_SITE_ID` + token). Preview origin: **`https://pr-<PR#>--<site-name>.netlify.app`**.
 4. On each PR, `.github/workflows/deploy-preview.yml` creates a **Neon branch**, runs **`npm run db:generate-migrate`** (migrations + generate), then **`netlify deploy --build`** with that branch’s pooled and direct URLs.
 5. When the PR closes, `.github/workflows/cleanup-preview.yml` deletes the Neon preview branch.
 
