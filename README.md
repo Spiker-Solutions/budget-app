@@ -93,12 +93,14 @@ Set these environment variables in your Netlify dashboard:
 
 ### Database migrations on Netlify
 
-Production builds run `npx prisma migrate deploy` before `npm run build` (see `netlify.toml`). Ensure **`DATABASE_URL`** is set for the **Production** context in Netlify.
+**Production**, **deploy previews** (PRs), and **branch deploys** all run `npx prisma migrate deploy && npm run build` (see `netlify.toml`).
 
-Deploy previews and branch deploys use the default `npm run build` only. Point each preview at its own database (recommended: a **Neon branch** per preview) and either:
+- **Production**: `DATABASE_URL` = Neon **main / production** branch.
+- **Previews**: `DATABASE_URL` must be a **different** database — typically a **Neon branch** created for that preview.
 
-- Run `npx prisma migrate deploy` once against that branch’s connection string after creating it, or
-- Add a `[context.deploy-preview]` (and optionally `[context.branch-deploy]`) `command` in `netlify.toml` that runs `prisma migrate deploy && npm run build` once you are comfortable auto-migrating preview databases.
+Use the **[Neon Netlify integration](https://neon.tech/docs/guides/netlify)** so each deploy preview gets its own Neon branch and a matching `DATABASE_URL` automatically; the build will migrate that branch schema on each preview deploy.
+
+**Important:** In Netlify environment variables, do not use the same `DATABASE_URL` for Production and Deploy previews unless you intend every PR to migrate production.
 
 ### Branch deploy previews
 
