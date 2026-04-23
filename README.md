@@ -128,7 +128,7 @@ Set both in Netlify for **Production** (and any other context that runs migratio
 
 ### NextAuth on previews
 
-The **GitHub Action** writes `NEXTAUTH_URL` and `NEXTAUTH_SECRET` into `.env` before `netlify deploy --build` (see `deploy-preview.yml`), using `NETLIFY_SITE_SLUG` and the `NEXTAUTH_SECRET` secret. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you need Google on previews, and add matching redirect URIs in Google Cloud (`https://pr-<PR#>--<slug>.netlify.app/api/auth/callback/google`). Many teams use email/password only on previews.
+The **GitHub Action** runs `netlify env:set … --context deploy-preview` for **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`DATABASE_URL`**, and **`DIRECT_URL`** before `netlify deploy --build`. That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without `NEXTAUTH_SECRET` there, NextAuth returns a generic “server configuration” error. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).
 
 ## Database Setup
 
