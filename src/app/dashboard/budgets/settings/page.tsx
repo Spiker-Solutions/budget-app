@@ -17,6 +17,7 @@ import {
   Badge,
   ActionIcon,
   Modal,
+  Switch,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
@@ -90,6 +91,7 @@ export default function BudgetSettingsPage() {
       periodDay: currentBudget?.periodDay || 1,
       customDays: currentBudget?.customDays || 30,
       startDate: currentBudget?.startDate ? new Date(currentBudget.startDate) : new Date(),
+      carryOverRemainder: currentBudget?.carryOverRemainder ?? false,
     },
   });
 
@@ -104,6 +106,7 @@ export default function BudgetSettingsPage() {
         periodDay: currentBudget.periodDay || 1,
         customDays: currentBudget.customDays || 30,
         startDate: currentBudget.startDate ? new Date(currentBudget.startDate) : new Date(),
+        carryOverRemainder: currentBudget.carryOverRemainder,
       });
     }
   }, [currentBudget]);
@@ -328,6 +331,12 @@ export default function BudgetSettingsPage() {
                 />
               </>
             )}
+
+            <Switch
+              label="Carry over unspent amounts"
+              description="Add each envelope's leftover from the previous period to its allocation for the new period. Envelopes can override this setting."
+              {...form.getInputProps("carryOverRemainder", { type: "checkbox" })}
+            />
 
             <Group justify="flex-end" mt="md">
               <Button variant="subtle" onClick={() => router.back()}>

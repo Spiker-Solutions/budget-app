@@ -48,6 +48,7 @@ export interface CreateBudgetInput {
   periodDay?: number;
   customDays?: number;
   startDate?: Date;
+  carryOverRemainder?: boolean;
 }
 
 export interface UpdateBudgetInput {
@@ -59,6 +60,7 @@ export interface UpdateBudgetInput {
   periodDay?: number;
   customDays?: number;
   startDate?: Date;
+  carryOverRemainder?: boolean;
 }
 
 export interface CreateEnvelopeInput {
@@ -66,12 +68,14 @@ export interface CreateEnvelopeInput {
   allocation: number;
   description?: string;
   budgetId: string;
+  carryOverRemainder?: boolean | null;
 }
 
 export interface UpdateEnvelopeInput {
   name?: string;
   allocation?: number;
   description?: string;
+  carryOverRemainder?: boolean | null;
 }
 
 export interface CreateExpenseInput {

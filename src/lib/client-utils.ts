@@ -1,3 +1,5 @@
+import { getPeriodContaining } from "@/lib/budget-period";
+
 export function formatCurrency(
   amount: number | string,
   currency = "USD"
@@ -14,65 +16,32 @@ export function normalizePayeeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/**
+ * @deprecated Prefer getPeriodContaining from @/lib/budget-period with full Budget fields.
+ * Legacy helper: CUSTOM periods without startDate align to the calendar day of referenceDate (same as before).
+ */
 export function calculatePeriodDates(
   periodType: "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "CUSTOM",
   periodDay: number | null,
   customDays: number | null,
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  options?: { startDate?: Date | null; budgetCreatedAt?: Date }
 ): { start: Date; end: Date } {
-  const now = new Date(referenceDate);
-
-  switch (periodType) {
-    case "WEEKLY": {
-      const dayOfWeek = periodDay ?? 0;
-      const currentDay = now.getDay();
-      const diff = currentDay >= dayOfWeek ? currentDay - dayOfWeek : 7 - (dayOfWeek - currentDay);
-      const start = new Date(now);
-      start.setDate(now.getDate() - diff);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    }
-
-    case "BIWEEKLY": {
-      const dayOfWeek = periodDay ?? 0;
-      const currentDay = now.getDay();
-      const diff = currentDay >= dayOfWeek ? currentDay - dayOfWeek : 7 - (dayOfWeek - currentDay);
-      const start = new Date(now);
-      start.setDate(now.getDate() - diff);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 13);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    }
-
-    case "MONTHLY": {
-      const dayOfMonth = periodDay ?? 1;
-      const start = new Date(now.getFullYear(), now.getMonth(), dayOfMonth, 0, 0, 0, 0);
-      if (start > now) {
-        start.setMonth(start.getMonth() - 1);
-      }
-      const end = new Date(start);
-      end.setMonth(end.getMonth() + 1);
-      end.setDate(end.getDate() - 1);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    }
-
-    case "CUSTOM": {
-      const days = customDays ?? 30;
-      const start = new Date(now);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(start);
-      end.setDate(start.getDate() + days - 1);
-      end.setHours(23, 59, 59, 999);
-      return { start, end };
-    }
-
-    default:
-      throw new Error(`Unknown period type: ${periodType}`);
-  }
+  const legacyAnchor = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
+  return getPeriodContaining(referenceDate, {
+    periodType,
+    periodDay,
+    customDays,
+    startDate: options?.startDate ?? null,
+    createdAt: options?.budgetCreatedAt ?? legacyAnchor,
+    carryOverRemainder: false,
+  });
 }

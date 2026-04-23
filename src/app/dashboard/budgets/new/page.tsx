@@ -12,6 +12,7 @@ import {
   Select,
   Button,
   Group,
+  Switch,
 } from "@mantine/core";
 import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
@@ -65,6 +66,7 @@ export default function NewBudgetPage() {
       periodDay: 1,
       customDays: 30,
       startDate: new Date(),
+      carryOverRemainder: false,
     },
     validate: {
       name: (value) => (value.length < 1 ? "Name is required" : null),
@@ -189,6 +191,12 @@ export default function NewBudgetPage() {
                 />
               </>
             )}
+
+            <Switch
+              label="Carry over unspent amounts"
+              description="Add each envelope's leftover from the previous period to its allocation for the new period. Envelopes can override this setting."
+              {...form.getInputProps("carryOverRemainder", { type: "checkbox" })}
+            />
 
             <Group justify="flex-end" mt="md">
               <Button variant="subtle" onClick={() => router.back()}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Title,
   Text,
@@ -35,6 +35,7 @@ import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { formatCurrency } from "@/lib/client-utils";
+import { computeCarryAndPeriodTotals } from "@/lib/budget-period";
 import dayjs from "dayjs";
 
 export default function EnvelopeDetailPage({
@@ -177,6 +178,36 @@ export default function EnvelopeDetailPage({
     }
   };
 
+  const budget = useMemo(
+    () => (envelope ? budgets.find((b) => b.id === envelope.budgetId) : undefined),
+    [envelope, budgets]
+  );
+
+  const periodTotals = useMemo(() => {
+    if (!envelope || !budget) return null;
+    const budgetInput = {
+      periodType: budget.periodType,
+      periodDay: budget.periodDay ?? null,
+      customDays: budget.customDays ?? null,
+      startDate: budget.startDate ? new Date(budget.startDate) : null,
+      createdAt: new Date(budget.createdAt),
+      carryOverRemainder: budget.carryOverRemainder,
+    };
+    const envelopeInputs = [
+      {
+        id: envelope.id,
+        allocation: Number(envelope.allocation),
+        carryOverRemainder: envelope.carryOverRemainder ?? null,
+      },
+    ];
+    const expenseInputs = expenses.map((e) => ({
+      envelopeId: e.envelopeId,
+      date: new Date(e.date),
+      amount: Number(e.amount),
+    }));
+    return computeCarryAndPeriodTotals(budgetInput, envelopeInputs, expenseInputs);
+  }, [budget, envelope, expenses]);
+
   if (loading) {
     return (
       <Stack>
@@ -198,11 +229,14 @@ export default function EnvelopeDetailPage({
     );
   }
 
-  const budget = budgets.find((b) => b.id === envelope.budgetId);
-  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const envPeriod = periodTotals?.envelopeTotals[0];
   const allocation = Number(envelope.allocation);
-  const remaining = allocation - totalSpent;
-  const percentage = allocation > 0 ? (totalSpent / allocation) * 100 : 0;
+  const carriedFromPrior = envPeriod?.carriedFromPrior ?? 0;
+  const availableThisPeriod = envPeriod?.availableThisPeriod ?? allocation;
+  const totalSpentThisPeriod = envPeriod?.spentThisPeriod ?? 0;
+  const remaining = envPeriod?.remainingThisPeriod ?? allocation - totalSpentThisPeriod;
+  const percentage =
+    availableThisPeriod > 0 ? (totalSpentThisPeriod / availableThisPeriod) * 100 : 0;
 
   return (
     <Stack>
@@ -233,6 +267,12 @@ export default function EnvelopeDetailPage({
               {envelope.description && (
                 <Text c="dimmed">{envelope.description}</Text>
               )}
+              {periodTotals && (
+                <Text size="sm" c="dimmed" mt={4}>
+                  Current period: {dayjs(periodTotals.currentPeriod.start).format("MMM D, YYYY")} –{" "}
+                  {dayjs(periodTotals.currentPeriod.end).format("MMM D, YYYY")}
+                </Text>
+              )}
             </div>
             <Badge
               size="xl"
@@ -254,23 +294,35 @@ export default function EnvelopeDetailPage({
           <Group grow>
             <div>
               <Text size="sm" c="dimmed">
-                Allocation
+                Base allocation
               </Text>
               <Text size="xl" fw={700}>
                 {formatCurrency(allocation, budget?.currency)}
               </Text>
+              {carriedFromPrior > 0 && (
+                <Text size="xs" c="dimmed">
+                  + {formatCurrency(carriedFromPrior, budget?.currency)} carried over
+                </Text>
+              )}
+              <Text size="xs" c="dimmed" mt={4}>
+                Available this period: {formatCurrency(availableThisPeriod, budget?.currency)}
+              </Text>
             </div>
             <div>
               <Text size="sm" c="dimmed">
-                Spent
+                Spent (this period)
               </Text>
-              <Text size="xl" fw={700} c={totalSpent > allocation ? "red" : undefined}>
-                {formatCurrency(totalSpent, budget?.currency)}
+              <Text
+                size="xl"
+                fw={700}
+                c={totalSpentThisPeriod > availableThisPeriod ? "red" : undefined}
+              >
+                {formatCurrency(totalSpentThisPeriod, budget?.currency)}
               </Text>
             </div>
             <div>
               <Text size="sm" c="dimmed">
-                Remaining
+                Remaining (this period)
               </Text>
               <Text size="xl" fw={700} c={remaining < 0 ? "red" : "green"}>
                 {formatCurrency(remaining, budget?.currency)}

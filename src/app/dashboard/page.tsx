@@ -21,6 +21,11 @@ import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
 import { formatCurrency } from "@/lib/client-utils";
+import {
+  computeCarryAndPeriodTotals,
+  type EnvelopePeriodTotals,
+} from "@/lib/budget-period";
+import dayjs from "dayjs";
 
 export default function DashboardPage() {
   const { budgets, isLoading: budgetsLoading } = useBudgetStore();
@@ -45,14 +50,48 @@ export default function DashboardPage() {
     [envelopes]
   );
 
-  const totalSpent = useMemo(
-    () => expenses.reduce((sum, e) => sum + Number(e.amount), 0),
-    [expenses]
-  );
+  const periodTotals = useMemo(() => {
+    if (!currentBudget) return null;
+    const budgetInput = {
+      periodType: currentBudget.periodType,
+      periodDay: currentBudget.periodDay ?? null,
+      customDays: currentBudget.customDays ?? null,
+      startDate: currentBudget.startDate ? new Date(currentBudget.startDate) : null,
+      createdAt: new Date(currentBudget.createdAt),
+      carryOverRemainder: currentBudget.carryOverRemainder,
+    };
+    const envelopeInputs = envelopes.map((e) => ({
+      id: e.id,
+      allocation: Number(e.allocation),
+      carryOverRemainder: e.carryOverRemainder,
+    }));
+    const expenseInputs = expenses.map((e) => ({
+      envelopeId: e.envelopeId,
+      date: new Date(e.date),
+      amount: Number(e.amount),
+    }));
+    return computeCarryAndPeriodTotals(budgetInput, envelopeInputs, expenseInputs);
+  }, [currentBudget, envelopes, expenses]);
+
+  const envelopeTotalsById = useMemo(() => {
+    const m = new Map<string, EnvelopePeriodTotals>();
+    if (periodTotals) {
+      for (const t of periodTotals.envelopeTotals) {
+        m.set(t.envelopeId, t);
+      }
+    }
+    return m;
+  }, [periodTotals]);
 
   const budgetAmount = currentBudget ? Number(currentBudget.amount) : 0;
-  const remaining = budgetAmount - totalSpent;
-  const spentPercentage = budgetAmount > 0 ? (totalSpent / budgetAmount) * 100 : 0;
+  const totalAvailableThisPeriod = periodTotals?.totalAvailableThisPeriod ?? 0;
+  const totalCarriedFromPrior = periodTotals?.totalCarriedFromPrior ?? 0;
+  const totalSpentThisPeriod = periodTotals?.totalSpentThisPeriod ?? 0;
+  const totalRemainingThisPeriod = periodTotals?.totalRemainingThisPeriod ?? 0;
+  const spentPercentage =
+    totalAvailableThisPeriod > 0
+      ? (totalSpentThisPeriod / totalAvailableThisPeriod) * 100
+      : 0;
 
   if (budgetsLoading) {
     return (
@@ -96,6 +135,12 @@ export default function DashboardPage() {
         <div>
           <Title order={2}>{currentBudget.name}</Title>
           <Text c="dimmed">{currentBudget.description || "Your budget"}</Text>
+          {periodTotals && (
+            <Text size="sm" c="dimmed" mt={4}>
+              Current period: {dayjs(periodTotals.currentPeriod.start).format("MMM D, YYYY")} –{" "}
+              {dayjs(periodTotals.currentPeriod.end).format("MMM D, YYYY")}
+            </Text>
+          )}
         </div>
         <Group>
           <Button
@@ -119,22 +164,35 @@ export default function DashboardPage() {
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
         <Card withBorder>
           <Text size="sm" c="dimmed" fw={500}>
-            Budget
+            Envelope total (this period)
           </Text>
           <Text size="xl" fw={700}>
-            {formatCurrency(budgetAmount, currentBudget.currency)}
+            {formatCurrency(totalAvailableThisPeriod, currentBudget.currency)}
           </Text>
           <Text size="xs" c="dimmed">
-            Total budget for this period
+            {formatCurrency(totalAllocated, currentBudget.currency)} base
+            {totalCarriedFromPrior > 0 && (
+              <>
+                {" "}
+                + {formatCurrency(totalCarriedFromPrior, currentBudget.currency)} carried over
+              </>
+            )}
+          </Text>
+          <Text size="xs" c="dimmed" mt={4}>
+            Planned budget: {formatCurrency(budgetAmount, currentBudget.currency)}
           </Text>
         </Card>
 
         <Card withBorder>
           <Text size="sm" c="dimmed" fw={500}>
-            Spent
+            Spent (this period)
           </Text>
-          <Text size="xl" fw={700} c={totalSpent > budgetAmount ? "red" : undefined}>
-            {formatCurrency(totalSpent, currentBudget.currency)}
+          <Text
+            size="xl"
+            fw={700}
+            c={totalSpentThisPeriod > totalAvailableThisPeriod ? "red" : undefined}
+          >
+            {formatCurrency(totalSpentThisPeriod, currentBudget.currency)}
           </Text>
           <Progress
             value={Math.min(spentPercentage, 100)}
@@ -146,13 +204,13 @@ export default function DashboardPage() {
 
         <Card withBorder>
           <Text size="sm" c="dimmed" fw={500}>
-            Remaining
+            Remaining (this period)
           </Text>
-          <Text size="xl" fw={700} c={remaining < 0 ? "red" : "green"}>
-            {formatCurrency(remaining, currentBudget.currency)}
+          <Text size="xl" fw={700} c={totalRemainingThisPeriod < 0 ? "red" : "green"}>
+            {formatCurrency(totalRemainingThisPeriod, currentBudget.currency)}
           </Text>
           <Text size="xs" c="dimmed">
-            {remaining >= 0 ? "Available to spend" : "Over budget"}
+            {totalRemainingThisPeriod >= 0 ? "Available to spend" : "Over envelope total"}
           </Text>
         </Card>
       </SimpleGrid>
@@ -193,19 +251,12 @@ export default function DashboardPage() {
       ) : (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
           {envelopes.map((envelope) => {
-            const envelopeExpenses = expenses.filter(
-              (e) => e.envelopeId === envelope.id
-            );
-            const envelopeSpent = envelopeExpenses.reduce(
-              (sum, e) => sum + Number(e.amount),
-              0
-            );
-            const envelopeAllocation = Number(envelope.allocation);
-            const envelopeRemaining = envelopeAllocation - envelopeSpent;
+            const envT = envelopeTotalsById.get(envelope.id);
+            const envelopeSpent = envT?.spentThisPeriod ?? 0;
+            const envelopeAvailable = envT?.availableThisPeriod ?? Number(envelope.allocation);
+            const envelopeRemaining = envT?.remainingThisPeriod ?? envelopeAvailable - envelopeSpent;
             const envelopePercentage =
-              envelopeAllocation > 0
-                ? (envelopeSpent / envelopeAllocation) * 100
-                : 0;
+              envelopeAvailable > 0 ? (envelopeSpent / envelopeAvailable) * 100 : 0;
 
             return (
               <Card

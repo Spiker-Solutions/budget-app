@@ -76,7 +76,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, amount, description, currency, periodType, periodDay, customDays, startDate } = result.data;
+    const {
+      name,
+      amount,
+      description,
+      currency,
+      periodType,
+      periodDay,
+      customDays,
+      startDate,
+      carryOverRemainder,
+    } = result.data;
 
     const budget = await prisma.budget.create({
       data: {
@@ -88,6 +98,7 @@ export async function POST(req: NextRequest) {
         periodDay,
         customDays,
         startDate: startDate ? new Date(startDate) : null,
+        carryOverRemainder,
         members: {
           create: {
             userId: session.user.id,
