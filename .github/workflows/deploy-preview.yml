@@ -66,17 +66,25 @@ jobs:
       - name: Deploy preview to Netlify
         id: deploy
         env:
-          NETLIFY_SITE_SLUG: ${{ vars.NETLIFY_SITE_SLUG }}
+          NETLIFY_SITE_SLUG_OVERRIDE: ${{ vars.NETLIFY_SITE_SLUG }}
           NEXTAUTH_SECRET_CI: ${{ secrets.NEXTAUTH_SECRET }}
         run: |
           set -euo pipefail
-          if [ -z "${NETLIFY_SITE_SLUG:-}" ]; then
-            echo "::error::Set repository variable NETLIFY_SITE_SLUG to your Netlify site subdomain (e.g. mrbudgets for https://mrbudgets.netlify.app). This workflow uses netlify deploy --alias=pr-<PR#>, so the public URL is https://pr-<PR#>--<slug>.netlify.app"
-            exit 1
-          fi
           if [ -z "${NEXTAUTH_SECRET_CI:-}" ]; then
             echo "::error::Set NEXTAUTH_SECRET in GitHub Actions secrets so the preview build can run (same value as Netlify production is fine)."
             exit 1
+          fi
+
+          if [ -n "${NETLIFY_SITE_SLUG_OVERRIDE:-}" ]; then
+            NETLIFY_SITE_SLUG="${NETLIFY_SITE_SLUG_OVERRIDE}"
+          else
+            SITE_JSON=$(curl -sSf -H "Authorization: Bearer ${{ env.NETLIFY_AUTH_TOKEN }}" \
+              "https://api.netlify.com/api/v1/sites/${{ env.NETLIFY_SITE_ID }}")
+            NETLIFY_SITE_SLUG=$(echo "$SITE_JSON" | jq -r '.name // empty')
+            if [ -z "$NETLIFY_SITE_SLUG" ]; then
+              echo "::error::Could not read site name from Netlify API. Check NETLIFY_SITE_ID and NETLIFY_AUTH_TOKEN, or set repository variable NETLIFY_SITE_SLUG (subdomain only, e.g. mrbudgets)."
+              exit 1
+            fi
           fi
 
           netlify link --id "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
