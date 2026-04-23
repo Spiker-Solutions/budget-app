@@ -9,6 +9,7 @@ export const createBudgetSchema = z.object({
   periodDay: z.number().min(0).max(31).optional(),
   customDays: z.number().min(1).max(365).optional(),
   startDate: z.string().or(z.date()).optional(),
+  carryOverRemainder: z.boolean().optional().default(false),
 });
 
 export const updateBudgetSchema = createBudgetSchema.partial();
@@ -18,6 +19,7 @@ export const createEnvelopeSchema = z.object({
   allocation: z.number().min(0, "Allocation cannot be negative"),
   description: z.string().max(500).optional(),
   budgetId: z.string().min(1, "Budget ID is required"),
+  carryOverRemainder: z.boolean().nullable().optional(),
 });
 
 export const updateEnvelopeSchema = createEnvelopeSchema.partial().omit({ budgetId: true });

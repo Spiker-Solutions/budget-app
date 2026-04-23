@@ -11,6 +11,7 @@ import {
   Textarea,
   Button,
   Group,
+  Select,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -19,17 +20,22 @@ import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useUiStore } from "@/stores/uiStore";
 import type { CreateEnvelopeInput } from "@/types";
 
+type EnvelopeFormValues = Omit<CreateEnvelopeInput, "budgetId" | "carryOverRemainder"> & {
+  carryMode: "inherit" | "on" | "off";
+};
+
 export default function NewEnvelopePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const { createEnvelope, fetchEnvelopes } = useEnvelopeStore();
   const { currentBudgetId } = useUiStore();
 
-  const form = useForm<Omit<CreateEnvelopeInput, "budgetId">>({
+  const form = useForm<EnvelopeFormValues>({
     initialValues: {
       name: "",
       allocation: 0,
       description: "",
+      carryMode: "inherit",
     },
     validate: {
       name: (value) => (value.length < 1 ? "Name is required" : null),
@@ -38,9 +44,7 @@ export default function NewEnvelopePage() {
     },
   });
 
-  const handleSubmit = async (
-    values: Omit<CreateEnvelopeInput, "budgetId">
-  ) => {
+  const handleSubmit = async (values: EnvelopeFormValues) => {
     if (!currentBudgetId) {
       notifications.show({
         title: "Error",
@@ -53,9 +57,13 @@ export default function NewEnvelopePage() {
     setLoading(true);
 
     try {
+      const { carryMode, ...rest } = values;
       const envelope = await createEnvelope({
-        ...values,
+        ...rest,
         budgetId: currentBudgetId,
+        ...(carryMode === "inherit"
+          ? {}
+          : { carryOverRemainder: carryMode === "on" }),
       });
 
       if (envelope) {
@@ -127,6 +135,17 @@ export default function NewEnvelopePage() {
               label="Description"
               placeholder="Optional description for this envelope"
               {...form.getInputProps("description")}
+            />
+
+            <Select
+              label="Carry over unspent amounts"
+              description="Inherit uses the budget setting. On or off overrides for this envelope only."
+              data={[
+                { value: "inherit", label: "Inherit from budget" },
+                { value: "on", label: "On" },
+                { value: "off", label: "Off" },
+              ]}
+              {...form.getInputProps("carryMode")}
             />
 
             <Group justify="flex-end" mt="md">

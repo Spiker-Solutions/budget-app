@@ -1,6 +1,21 @@
 [build]
   command = "npm run build"
 
+# Run migrations before build whenever this deploy has a DATABASE_URL.
+# Production: set DATABASE_URL to your Neon main branch.
+# Deploy previews / branch deploys: set DATABASE_URL to a Neon *branch* connection string
+# (e.g. Neon Netlify integration injects it per preview). Do not point previews at prod.
+[context.production]
+  command = "npx prisma migrate deploy && npm run build"
+
+# Used when Netlify builds a PR preview (e.g. `netlify deploy --build` from GitHub Actions).
+# Migrations run in CI before deploy — see https://neon.com/guides/preview-deploys-netlify
+[context.deploy-preview]
+  command = "npx prisma generate && npm run build"
+
+[context.branch-deploy]
+  command = "npx prisma migrate deploy && npm run build"
+
 [build.environment]
   NODE_VERSION = "20"
   # NEXTAUTH_URL is a public origin (not a password). Next.js/NextAuth inlines it into

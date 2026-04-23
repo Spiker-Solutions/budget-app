@@ -12,6 +12,7 @@ import {
   Button,
   Group,
   Skeleton,
+  Select,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -20,6 +21,15 @@ import { IconArrowLeft } from "@tabler/icons-react";
 import Link from "next/link";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import type { UpdateEnvelopeInput } from "@/types";
+
+type EnvelopeEditFormValues = Omit<UpdateEnvelopeInput, "carryOverRemainder"> & {
+  carryMode: "inherit" | "on" | "off";
+};
+
+function carryModeFromEnvelope(v: boolean | null | undefined): "inherit" | "on" | "off" {
+  if (v === null || v === undefined) return "inherit";
+  return v ? "on" : "off";
+}
 
 export default function EditEnvelopePage({
   params,
@@ -32,11 +42,12 @@ export default function EditEnvelopePage({
   const [saving, setSaving] = useState(false);
   const { updateEnvelope, fetchEnvelopes } = useEnvelopeStore();
 
-  const form = useForm<UpdateEnvelopeInput>({
+  const form = useForm<EnvelopeEditFormValues>({
     initialValues: {
       name: "",
       allocation: 0,
       description: "",
+      carryMode: "inherit",
     },
     validate: {
       name: (value) => (value && value.length < 1 ? "Name is required" : null),
@@ -57,6 +68,7 @@ export default function EditEnvelopePage({
             name: data.data.name,
             allocation: Number(data.data.allocation),
             description: data.data.description || "",
+            carryMode: carryModeFromEnvelope(data.data.carryOverRemainder),
           });
         } else {
           router.push("/dashboard");
@@ -72,16 +84,21 @@ export default function EditEnvelopePage({
     fetchEnvelope();
   }, [params.id, router]);
 
-  const handleSubmit = async (values: UpdateEnvelopeInput) => {
+  const handleSubmit = async (values: EnvelopeEditFormValues) => {
     setSaving(true);
 
     try {
-      const success = await updateEnvelope(params.id, values);
+      const { carryMode, ...rest } = values;
+      const payload: UpdateEnvelopeInput = {
+        ...rest,
+        carryOverRemainder: carryMode === "inherit" ? null : carryMode === "on",
+      };
+      const success = await updateEnvelope(params.id, payload);
 
       if (success) {
         notifications.show({
           title: "Envelope updated",
-          message: `"${values.name}" has been updated successfully`,
+          message: `"${payload.name}" has been updated successfully`,
           color: "green",
         });
         if (envelope?.budgetId) {
@@ -169,6 +186,17 @@ export default function EditEnvelopePage({
               label="Description"
               placeholder="Optional description for this envelope"
               {...form.getInputProps("description")}
+            />
+
+            <Select
+              label="Carry over unspent amounts"
+              description="Inherit uses the budget setting. On or off overrides for this envelope only."
+              data={[
+                { value: "inherit", label: "Inherit from budget" },
+                { value: "on", label: "On" },
+                { value: "off", label: "Off" },
+              ]}
+              {...form.getInputProps("carryMode")}
             />
 
             <Group justify="flex-end" mt="md">

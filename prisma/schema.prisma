@@ -3,8 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Non-pooled connection for migrations (Neon: use "direct" in dashboard). For local Docker, set the same as DATABASE_URL.
+  directUrl = env("DIRECT_URL")
 }
 
 // NextAuth.js required models
@@ -72,6 +74,7 @@ model Budget {
   periodDay   Int?
   customDays  Int?
   startDate   DateTime?
+  carryOverRemainder Boolean @default(false)
 
   members   BudgetUser[]
   envelopes Envelope[]
@@ -114,6 +117,7 @@ model Envelope {
   allocation  Decimal @db.Decimal(12, 2)
   description String?
   budgetId    String
+  carryOverRemainder Boolean?
 
   budget   Budget         @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   members  EnvelopeUser[]
