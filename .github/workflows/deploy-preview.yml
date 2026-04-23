@@ -14,6 +14,8 @@ env:
   NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
   NEON_DATABASE_NAME: ${{ secrets.NEON_DATABASE_NAME }}
   NEON_DATABASE_USERNAME: ${{ secrets.NEON_DATABASE_USERNAME }}
+  # Neon DB branch to fork preview branches from (not production). Use a repo variable to override.
+  NEON_PREVIEW_PARENT: ${{ vars.NEON_PREVIEW_PARENT_BRANCH || 'development' }}
   NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
   NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
@@ -38,6 +40,9 @@ jobs:
           project_id: ${{ env.NEON_PROJECT_ID }}
           database: ${{ env.NEON_DATABASE_NAME }}
           username: ${{ env.NEON_DATABASE_USERNAME }}
+          # Fork from staging-like branch so previews do not copy production data.
+          # https://github.com/neondatabase/create-branch-action — input is `parent` (v5).
+          parent: ${{ env.NEON_PREVIEW_PARENT }}
           branch_name: preview/pr-${{ github.event.number }}-${{ steps.branch-name.outputs.current_branch }}
 
       - name: Setup Node.js

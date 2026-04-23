@@ -109,6 +109,10 @@ Summary of that approach:
 
 This repo includes those workflows; enable them by adding the secrets. **Do not** point preview builds at your production `DATABASE_URL`.
 
+**Preview Neon branches fork from `development`**, not production (see `parent` in `deploy-preview.yml`). A Neon branch named **`development`** must exist; keep it free of real customer data (empty DB, seed data, or periodic reset). Override the parent name with a GitHub **repository variable** `NEON_PREVIEW_PARENT_BRANCH` if you use a different Neon branch.
+
+**Migrations and merging to `main`:** PR previews run `prisma migrate deploy` only on the **temporary preview** Neon branch. Merging the PR does **not** run those migrations on production by itself—production schema updates when a **production** deploy runs (e.g. Netlify build on `main`) with `migrate deploy` against your **production** Neon branch. Keep migration files in the PR as usual; after merge, deploy `main` so production applies the same migration history. Periodically refresh your **`development`** Neon branch (e.g. reset from `production` in Neon console, or re-run migrations) so it stays schema-aligned without carrying prod data you do not want copied.
+
 ### Prisma + Neon: `DATABASE_URL` and `DIRECT_URL`
 
 `schema.prisma` uses **`directUrl`** for migrations. In Neon:
