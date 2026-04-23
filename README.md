@@ -77,7 +77,8 @@ Set these environment variables in your Netlify dashboard:
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (Neon: use the **pooled** URL for serverless) |
+| `DIRECT_URL` | Same database, **direct** (non-pooled) URL — required for `prisma migrate` (local: can match `DATABASE_URL`) |
 | `NEXTAUTH_URL` | Your production URL (e.g., `https://your-app.netlify.app`) |
 | `NEXTAUTH_SECRET` | Random secret (generate with `openssl rand -base64 32`) |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (optional) |
@@ -93,20 +94,35 @@ Set these environment variables in your Netlify dashboard:
 
 ### Database migrations on Netlify
 
-**Production**, **deploy previews** (PRs), and **branch deploys** all run `npx prisma migrate deploy && npm run build` (see `netlify.toml`).
+**Production** and **branch deploys** (if enabled in Netlify) run `npx prisma migrate deploy && npm run build` (see `netlify.toml`).
 
-- **Production**: `DATABASE_URL` = Neon **main / production** branch.
-- **Previews**: `DATABASE_URL` must be a **different** database — typically a **Neon branch** created for that preview.
+Neon recommends a **separate Postgres branch per pull request**, with migrations run against that branch, then a preview deployed to Netlify. That flow is **not** a button in the Netlify UI; it is **GitHub Actions** + Neon’s API. Follow Neon’s guide (same flow as this repo’s workflows):
 
-Use the **[Neon Netlify integration](https://neon.tech/docs/guides/netlify)** so each deploy preview gets its own Neon branch and a matching `DATABASE_URL` automatically; the build will migrate that branch schema on each preview deploy.
+- **[Automate preview deployments with Netlify and Neon](https://neon.com/guides/preview-deploys-netlify)**
 
-**Important:** In Netlify environment variables, do not use the same `DATABASE_URL` for Production and Deploy previews unless you intend every PR to migrate production.
+Summary of that approach:
 
-### Branch deploy previews
+1. In Netlify, set **Deploy previews** to **None** (so Netlify does not build PRs on its own). Production still builds from your main branch as usual.
+2. Add GitHub repository secrets (`NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_DATABASE_NAME`, `NEON_DATABASE_USERNAME`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`) as described in the guide.
+3. On each PR, `.github/workflows/deploy-preview.yml` creates a **Neon branch**, runs **`npm run db:generate-migrate`** (migrations + generate), then **`netlify deploy --build`** with that branch’s pooled and direct URLs.
+4. When the PR closes, `.github/workflows/cleanup-preview.yml` deletes the Neon preview branch.
 
-1. In Netlify: **Site configuration → Build & deploy → Continuous deployment → Branches and deploy contexts**, enable **Deploy Previews** for pull requests and configure **Branch deploys** (e.g. allow all branches or a name pattern).
-2. **Neon + previews**: Create a Neon **database branch** (or use the [Neon Netlify integration](https://neon.tech/docs/guides/netlify)) so each preview uses an isolated `DATABASE_URL`. Do not point previews at production data unless you accept the risk.
-3. **NextAuth on previews**: OAuth callbacks need **`NEXTAUTH_URL`** to match the site origin. Production should use your primary domain. For deploy previews, either set **`NEXTAUTH_URL`** per preview (tedious) or use a build-time value: Netlify sets **`DEPLOY_PRIME_URL`** during builds (see [Netlify env vars](https://docs.netlify.com/configure-builds/environment-variables/)). Some teams add a small build script or plugin that writes `NEXTAUTH_URL` from `DEPLOY_PRIME_URL` for preview contexts only; others skip OAuth on previews and test with credentials providers only.
+This repo includes those workflows; enable them by adding the secrets. **Do not** point preview builds at your production `DATABASE_URL`.
+
+### Prisma + Neon: `DATABASE_URL` and `DIRECT_URL`
+
+`schema.prisma` uses **`directUrl`** for migrations. In Neon:
+
+- **`DATABASE_URL`**: pooled connection string (for the app at runtime).
+- **`DIRECT_URL`**: direct (non-pooled) connection string (for `prisma migrate`).
+
+For **local Docker**, set **`DIRECT_URL`** to the same value as **`DATABASE_URL`**.
+
+Set both in Netlify for **Production** (and any other context that runs migrations).
+
+### NextAuth on previews
+
+OAuth needs **`NEXTAUTH_URL`** to match the preview origin. The Neon guide pulls **deploy-preview** env vars from Netlify into `.env` before `netlify deploy`; add **`NEXTAUTH_SECRET`** (and Google keys if used) to the **Deploy previews** context in Netlify. Preview URLs are still awkward for Google OAuth redirect URIs; many teams test previews with email/password only.
 
 ## Database Setup
 
