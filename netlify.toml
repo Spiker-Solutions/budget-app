@@ -3,6 +3,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # NEXTAUTH_URL is a public origin (not a password). Next.js/NextAuth inlines it into
+  # bundles, which Netlify secrets scanning would otherwise flag as a leak.
+  SECRETS_SCAN_OMIT_KEYS = "NEXTAUTH_URL"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
