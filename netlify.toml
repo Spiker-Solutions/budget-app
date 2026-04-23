@@ -1,6 +1,13 @@
 [build]
   command = "npm run build"
 
+# Apply pending Prisma migrations only on production deploys. Deploy previews use the
+# default command above; give previews their own DATABASE_URL (e.g. Neon branch) and
+# either run `prisma migrate deploy` locally against that branch or add a
+# [context.deploy-preview] command once a preview DB is configured.
+[context.production]
+  command = "npx prisma migrate deploy && npm run build"
+
 [build.environment]
   NODE_VERSION = "20"
   # NEXTAUTH_URL is a public origin (not a password). Next.js/NextAuth inlines it into
