@@ -155,20 +155,6 @@ export async function DELETE(
       );
     }
 
-    const ownerCount = await prisma.budgetUser.count({
-      where: {
-        budgetId,
-        role: "OWNER",
-      },
-    });
-
-    if (ownerCount === 1 && targetMember?.role === "OWNER") {
-      return NextResponse.json(
-        errorResponse("Cannot remove the last owner"),
-        { status: 400 }
-      );
-    }
-
     await prisma.budgetUser.delete({
       where: {
         userId_budgetId: {
