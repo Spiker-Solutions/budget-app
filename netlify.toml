@@ -18,8 +18,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # NextAuth: Netlify often omits x-forwarded-proto; without this, req.origin is empty and
-  # sign-in can crash. Same pattern as Vercel (AUTH_TRUST_HOST / forwarded host).
+  # NextAuth (build only): Netlify does not inject [build.environment] into Functions at runtime.
+  # For production, set AUTH_TRUST_HOST=true in the Netlify UI (scope includes Functions).
+  # PR previews: .github/workflows/deploy-preview.yml sets it via netlify env:set.
   AUTH_TRUST_HOST = "true"
   # NEXTAUTH_URL is a public origin (not a password). Next.js/NextAuth inlines it into
   # bundles, which Netlify secrets scanning would otherwise flag as a leak.

@@ -81,7 +81,7 @@ Set these environment variables in your Netlify dashboard:
 | `DIRECT_URL` | Same database, **direct** (non-pooled) URL — required for `prisma migrate` (local: can match `DATABASE_URL`) |
 | `NEXTAUTH_URL` | Your production URL (e.g., `https://your-app.netlify.app`) |
 | `NEXTAUTH_SECRET` | Random secret (generate with `openssl rand -base64 32`) |
-| `AUTH_TRUST_HOST` | Set to `true` on Netlify (see `netlify.toml`) so NextAuth can derive the request origin when `x-forwarded-proto` is missing |
+| `AUTH_TRUST_HOST` | Set to `true` in the Netlify **dashboard** (include **Functions** scope) so NextAuth can derive the request origin when `x-forwarded-proto` is missing. `netlify.toml` alone does not pass this into Functions at runtime. |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (optional) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (optional) |
 
