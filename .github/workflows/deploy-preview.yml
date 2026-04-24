@@ -119,6 +119,16 @@ jobs:
           export AUTH_SECRET="${NEXTAUTH_SECRET_CI}"
           export AUTH_TRUST_HOST="true"
 
+          # Bundle DB + NEXTAUTH_URL for CLI alias deploys (Netlify often omits site env in Lambdas).
+          mkdir -p src/generated
+          jq -n \
+            --arg db "${DB_POOLER}" \
+            --arg direct "${DB_DIRECT}" \
+            --arg url "${PREVIEW_ORIGIN}" \
+            --arg secret "${NEXTAUTH_SECRET_CI}" \
+            '{mode: "netlify-cli-alias-preview", DATABASE_URL: $db, DIRECT_URL: $direct, NEXTAUTH_URL: $url, NEXTAUTH_SECRET: $secret, AUTH_TRUST_HOST: "true"}' \
+            > src/generated/netlify-preview-env.json
+
           # Debug: show what Netlify has for all contexts
           echo "=== Netlify env vars for deploy-preview context ==="
           netlify env:list --context deploy-preview --auth "$AUTH" || true

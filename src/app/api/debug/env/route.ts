@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import previewFile from "@/generated/netlify-preview-env.json";
 
 /** Must be dynamic: static generation would bake in build-time env, not Lambda runtime. */
 export const dynamic = "force-dynamic";
@@ -61,6 +62,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
+    bundledPreviewEnvMode: (previewFile as { mode?: string }).mode ?? "unknown",
     envVars,
     prisma: { status: prismaStatus, error: prismaError },
     authModule: { status: authModuleStatus, error: authModuleError },
