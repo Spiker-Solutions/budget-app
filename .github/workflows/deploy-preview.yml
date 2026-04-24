@@ -83,6 +83,8 @@ jobs:
           fi
           PREVIEW_URL="https://pr-${{ github.event.number }}--${SITE_SLUG}.netlify.app"
 
+          # Local .env is only for the CLI build step. Netlify Functions do not read this file;
+          # they need the same keys in the site's deploy-preview env (builds + functions scopes).
           : > .env
           netlify env:list --context deploy-preview --plain >> .env
           echo "DIRECT_URL=${{ steps.create-branch.outputs.db_url }}" >> .env
@@ -90,6 +92,22 @@ jobs:
           echo "NEXTAUTH_URL=${PREVIEW_URL}" >> .env
           echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
           echo "AUTH_TRUST_HOST=true" >> .env
+
+          netlify env:set DIRECT_URL "${{ steps.create-branch.outputs.db_url }}" \
+            --context deploy-preview --scope builds --scope functions --force \
+            --site "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          netlify env:set DATABASE_URL "${{ steps.create-branch.outputs.db_url_with_pooler }}" \
+            --context deploy-preview --scope builds --scope functions --force \
+            --site "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          netlify env:set NEXTAUTH_URL "${PREVIEW_URL}" \
+            --context deploy-preview --scope builds --scope functions --force \
+            --site "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          netlify env:set AUTH_TRUST_HOST "true" \
+            --context deploy-preview --scope builds --scope functions --force \
+            --site "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" \
+            --context deploy-preview --scope builds --scope functions --secret --force \
+            --site "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
 
           netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
           DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)

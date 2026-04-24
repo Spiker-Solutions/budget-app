@@ -18,7 +18,7 @@ This repo follows **[Automate preview deployments with Netlify and Neon](https:/
 
 Workflows:
 
-- `.github/workflows/deploy-preview.yml` — creates a Neon branch, runs `npm run generate-migrate`, then `netlify deploy --context=deploy-preview` with a `.env` built from `netlify env:list` plus per-PR `DATABASE_URL` / `DIRECT_URL` / preview `NEXTAUTH_*`.
+- `.github/workflows/deploy-preview.yml` — creates a Neon branch, runs `npm run generate-migrate`, then pushes per-PR `DATABASE_URL` / `DIRECT_URL` / `NEXTAUTH_*` / `AUTH_TRUST_HOST` to Netlify’s **deploy-preview** context with **builds** and **functions** scopes (so API routes can reach Postgres), builds from a merged `.env`, and runs `netlify deploy --context=deploy-preview`.
 - `.github/workflows/cleanup-preview.yml` — deletes the preview Neon branch when the PR closes.
 
 **Scripts (per Neon guide):** `generate-migrate` = `prisma generate && prisma migrate deploy`; `build` = `prisma generate && next build`.
