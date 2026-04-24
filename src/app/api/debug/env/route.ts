@@ -1,21 +1,21 @@
 import { NextResponse } from "next/server";
 
 /**
- * Diagnostic endpoint to check which env vars are available in the Netlify function runtime.
+ * Diagnostic endpoint to check which env vars are available in the Netlify function runtime
+ * and whether Prisma can connect.
  * Remove this before going to production with real users.
  */
 export async function GET() {
   const safeValue = (key: string) => {
     const val = process.env[key];
     if (!val) return "(not set)";
-    // Redact secrets but confirm they exist
     if (key.includes("SECRET") || key.includes("PASSWORD") || key === "DATABASE_URL" || key === "DIRECT_URL") {
       return `(set, length=${val.length})`;
     }
     return val;
   };
 
-  return NextResponse.json({
+  const envVars = {
     NODE_ENV: process.env.NODE_ENV,
     NEXTAUTH_URL: safeValue("NEXTAUTH_URL"),
     NEXTAUTH_SECRET: safeValue("NEXTAUTH_SECRET"),
@@ -24,9 +24,37 @@ export async function GET() {
     DIRECT_URL: safeValue("DIRECT_URL"),
     GOOGLE_CLIENT_ID: safeValue("GOOGLE_CLIENT_ID"),
     GOOGLE_CLIENT_SECRET: safeValue("GOOGLE_CLIENT_SECRET"),
-    // Netlify-specific
     CONTEXT: process.env.CONTEXT ?? "(not set)",
     DEPLOY_URL: process.env.DEPLOY_URL ?? "(not set)",
     URL: process.env.URL ?? "(not set)",
+  };
+
+  // Test Prisma connection
+  let prismaStatus: string;
+  let prismaError: string | null = null;
+  try {
+    const { prisma } = await import("@/lib/prisma");
+    await prisma.$queryRaw`SELECT 1`;
+    prismaStatus = "connected";
+  } catch (err) {
+    prismaStatus = "failed";
+    prismaError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  }
+
+  // Test auth module import
+  let authModuleStatus: string;
+  let authModuleError: string | null = null;
+  try {
+    const { authOptions } = await import("@/lib/auth");
+    authModuleStatus = authOptions ? "loaded" : "empty";
+  } catch (err) {
+    authModuleStatus = "failed";
+    authModuleError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  }
+
+  return NextResponse.json({
+    envVars,
+    prisma: { status: prismaStatus, error: prismaError },
+    authModule: { status: authModuleStatus, error: authModuleError },
   });
 }
