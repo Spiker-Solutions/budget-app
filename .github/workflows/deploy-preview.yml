@@ -100,13 +100,14 @@ jobs:
           # "Setting the context and scope at the same time on an existing env var is not allowed."
           # @see https://docs.netlify.com/build/functions/environment-variables/
           AUTH="${{ env.NETLIFY_AUTH_TOKEN }}"
-          for KEY in NEXTAUTH_SECRET NEXTAUTH_URL DATABASE_URL DIRECT_URL; do
+          for KEY in NEXTAUTH_SECRET NEXTAUTH_URL DATABASE_URL DIRECT_URL AUTH_TRUST_HOST; do
             netlify env:unset "$KEY" --context deploy-preview --force --auth "$AUTH" || true
           done
           netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview --secret --force --auth "$AUTH"
           netlify env:set NEXTAUTH_URL "${PREVIEW_ORIGIN}" --context deploy-preview --force --auth "$AUTH"
           netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview --force --auth "$AUTH"
           netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview --force --auth "$AUTH"
+          netlify env:set AUTH_TRUST_HOST "true" --context deploy-preview --force --auth "$AUTH"
 
           : > .env
           netlify env:list --context deploy-preview --plain >> .env || true
@@ -114,6 +115,7 @@ jobs:
           echo "DATABASE_URL=${DB_POOLER}" >> .env
           echo "NEXTAUTH_URL=${PREVIEW_ORIGIN}" >> .env
           echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
+          echo "AUTH_TRUST_HOST=true" >> .env
 
           netlify deploy --build --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
           DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)

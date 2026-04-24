@@ -81,6 +81,7 @@ Set these environment variables in your Netlify dashboard:
 | `DIRECT_URL` | Same database, **direct** (non-pooled) URL — required for `prisma migrate` (local: can match `DATABASE_URL`) |
 | `NEXTAUTH_URL` | Your production URL (e.g., `https://your-app.netlify.app`) |
 | `NEXTAUTH_SECRET` | Random secret (generate with `openssl rand -base64 32`) |
+| `AUTH_TRUST_HOST` | Set to `true` on Netlify (see `netlify.toml`) so NextAuth can derive the request origin when `x-forwarded-proto` is missing |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID (optional) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (optional) |
 
@@ -128,13 +129,13 @@ Set both in Netlify for **Production** (and any other context that runs migratio
 
 The app adjusts pooled Neon URLs at runtime for Prisma on serverless (`pgbouncer=true`, `connect_timeout`, `connection_limit`) — see `src/lib/neon-db-url.ts`. You can still add these to `DATABASE_URL` in the Neon console if you prefer.
 
-`next.config.js` sets **`experimental.outputFileTracingIncludes`** for `/api/**/*` so the Prisma query engine under `node_modules/.prisma/client` is packaged into Netlify serverless functions. Without it, `/api/auth/*` can crash at runtime with Netlify’s generic “function has crashed” page.
+`next.config.js` sets **`experimental.outputFileTracingIncludes`** for `/api/**/*` so the Prisma query engine is traced into Next’s server bundles. **`netlify.toml`** also sets **`functions.external_node_modules`** for `@prisma/client` and **`functions.included_files`** for `node_modules/.prisma/client/**` so esbuild does not strip the `.so.node` engine. Without these, `/api/auth/*` can crash at runtime with Netlify’s generic “function has crashed” page.
 
 **Netlify:** In **Site configuration → Environment variables**, each sensitive var (`DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_SECRET`, etc.) must include **Functions** in its scope (and **Builds** if used at build time). Variables scoped to **Builds only** are **not** visible to API routes — you get Prisma initialization errors and “Database unavailable” on register/login. The preview workflow sets **deploy-preview** values without `--scope` so Netlify applies **all scopes** (CLI errors if you combine `--scope` with `--context` when the key already exists in another context).
 
 ### NextAuth on previews
 
-The **GitHub Action** runs `netlify env:set … --context deploy-preview` for **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`DATABASE_URL`**, and **`DIRECT_URL`** before `netlify deploy --build`. That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without `NEXTAUTH_SECRET` there, NextAuth returns a generic “server configuration” error. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).
+The **GitHub Action** runs `netlify env:set … --context deploy-preview` for **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`DATABASE_URL`**, **`DIRECT_URL`**, and **`AUTH_TRUST_HOST=true`** before `netlify deploy --build`. That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without `NEXTAUTH_SECRET` there, NextAuth returns a generic “server configuration” error. **`AUTH_TRUST_HOST`** avoids empty `req.origin` when Netlify omits `x-forwarded-proto`, which can otherwise crash sign-in. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).
 
 ## Database Setup
 

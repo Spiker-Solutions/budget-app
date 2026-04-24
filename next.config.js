@@ -5,7 +5,10 @@ const nextConfig = {
   // (avoids runtime crash / "function has crashed" on auth routes).
   experimental: {
     outputFileTracingIncludes: {
-      "/api/**/*": ["./node_modules/.prisma/client/**/*"],
+      "/api/**/*": [
+        "./node_modules/.prisma/client/**/*",
+        "./node_modules/@prisma/client/**/*",
+      ],
     },
   },
 };

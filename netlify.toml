@@ -18,6 +18,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # NextAuth: Netlify often omits x-forwarded-proto; without this, req.origin is empty and
+  # sign-in can crash. Same pattern as Vercel (AUTH_TRUST_HOST / forwarded host).
+  AUTH_TRUST_HOST = "true"
   # NEXTAUTH_URL is a public origin (not a password). Next.js/NextAuth inlines it into
   # bundles, which Netlify secrets scanning would otherwise flag as a leak.
   SECRETS_SCAN_OMIT_KEYS = "NEXTAUTH_URL"
@@ -27,6 +30,10 @@
 
 [functions]
   node_bundler = "esbuild"
+  # Prisma: keep the query engine out of the esbuild bundle and ship it as a file
+  # (avoids "function has crashed" when the .so.node binary is missing at runtime).
+  external_node_modules = ["@prisma/client"]
+  included_files = ["node_modules/.prisma/client/**"]
 
 [[headers]]
   for = "/*"
