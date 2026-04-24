@@ -61,7 +61,7 @@ jobs:
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url_with_pooler }}
 
       - name: Install Netlify CLI
-        run: npm install -g netlify-cli
+        run: npm install -g netlify-cli@25
 
       - name: Deploy preview to Netlify
         id: deploy
@@ -94,19 +94,19 @@ jobs:
           DB_DIRECT='${{ steps.create-branch.outputs.db_url }}'
           DB_POOLER='${{ steps.create-branch.outputs.db_url_with_pooler }}'
 
-          # GitHub runner .env is only for the local build. API routes need vars scoped to Functions.
-          # Netlify rejects changing --context and --scope together on an existing key — unset this
-          # context first, then set value + scope in one shot.
+          # GitHub runner .env is only for the local build. API routes need env in Functions.
+          # Omit --scope: Netlify defaults to all scopes (builds + functions + …) for new values.
+          # Using --context and --scope together on a key that already exists (e.g. production) fails:
+          # "Setting the context and scope at the same time on an existing env var is not allowed."
           # @see https://docs.netlify.com/build/functions/environment-variables/
           AUTH="${{ env.NETLIFY_AUTH_TOKEN }}"
-          SCOPE="--scope builds functions"
           for KEY in NEXTAUTH_SECRET NEXTAUTH_URL DATABASE_URL DIRECT_URL; do
             netlify env:unset "$KEY" --context deploy-preview --force --auth "$AUTH" || true
           done
-          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview ${SCOPE} --secret --force --auth "$AUTH"
-          netlify env:set NEXTAUTH_URL "${PREVIEW_ORIGIN}" --context deploy-preview ${SCOPE} --force --auth "$AUTH"
-          netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview ${SCOPE} --force --auth "$AUTH"
-          netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview ${SCOPE} --force --auth "$AUTH"
+          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview --secret --force --auth "$AUTH"
+          netlify env:set NEXTAUTH_URL "${PREVIEW_ORIGIN}" --context deploy-preview --force --auth "$AUTH"
+          netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview --force --auth "$AUTH"
+          netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview --force --auth "$AUTH"
 
           : > .env
           netlify env:list --context deploy-preview --plain >> .env || true
