@@ -104,6 +104,11 @@ jobs:
             echo "AUTH_TRUST_HOST=true"
           } > .env
 
+          # Debug: show what's actually in .env
+          echo "=== .env contents ==="
+          cat .env
+          echo "=== end .env ==="
+
           # Also export to shell so the build subprocess sees them
           export DATABASE_URL="${DB_POOLER}"
           export DIRECT_URL="${DB_DIRECT}"
@@ -113,7 +118,7 @@ jobs:
 
           # Debug: confirm the values are correct before build
           echo "DATABASE_URL length: ${#DATABASE_URL}"
-          echo "DATABASE_URL prefix: ${DATABASE_URL:0:30}..."
+          echo "DATABASE_URL starts with: ${DATABASE_URL:0:15}"
 
           # Build locally with env vars in shell, then deploy the built output.
           # Using --dir (not --build) so Netlify doesn't re-run the build with its own env context.
