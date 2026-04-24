@@ -96,13 +96,13 @@ jobs:
 
           # Write .env so Next.js build has access to these values.
           # The .env is read at build time for static generation and bundling.
-          cat > .env << ENVEOF
-          DATABASE_URL=${DB_POOLER}
-          DIRECT_URL=${DB_DIRECT}
-          NEXTAUTH_URL=${PREVIEW_ORIGIN}
-          NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}
-          AUTH_TRUST_HOST=true
-          ENVEOF
+          cat > .env <<ENVEOF
+DATABASE_URL=${DB_POOLER}
+DIRECT_URL=${DB_DIRECT}
+NEXTAUTH_URL=${PREVIEW_ORIGIN}
+NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}
+AUTH_TRUST_HOST=true
+ENVEOF
 
           # Also export to shell so the build subprocess sees them
           export DATABASE_URL="${DB_POOLER}"
