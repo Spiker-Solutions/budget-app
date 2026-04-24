@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Netlify serverless runs Linux; include engine for deploy runtime (local uses native).
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

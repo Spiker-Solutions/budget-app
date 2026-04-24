@@ -94,12 +94,14 @@ jobs:
           DB_DIRECT='${{ steps.create-branch.outputs.db_url }}'
           DB_POOLER='${{ steps.create-branch.outputs.db_url_with_pooler }}'
 
-          # GitHub runner .env is only for the local build. Netlify Functions read site env —
-          # without this, NEXTAUTH_SECRET is missing at runtime (MissingSecret / "server configuration").
-          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview --secret --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
-          netlify env:set NEXTAUTH_URL "${PREVIEW_ORIGIN}" --context deploy-preview --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
-          netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
-          netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          # GitHub runner .env is only for the local build. API routes run in Functions and need
+          # env vars scoped to "functions" (not builds-only), or Prisma sees no DATABASE_URL at runtime.
+          # @see https://docs.netlify.com/build/functions/environment-variables/
+          SCOPE="--scope builds functions"
+          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview ${SCOPE} --secret --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          netlify env:set NEXTAUTH_URL "${PREVIEW_ORIGIN}" --context deploy-preview ${SCOPE} --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview ${SCOPE} --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview ${SCOPE} --force --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
 
           : > .env
           netlify env:list --context deploy-preview --plain >> .env || true

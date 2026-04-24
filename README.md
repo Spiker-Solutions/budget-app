@@ -128,6 +128,8 @@ Set both in Netlify for **Production** (and any other context that runs migratio
 
 The app adjusts pooled Neon URLs at runtime for Prisma on serverless (`pgbouncer=true`, `connect_timeout`, `connection_limit`) — see `src/lib/neon-db-url.ts`. You can still add these to `DATABASE_URL` in the Neon console if you prefer.
 
+**Netlify:** In **Site configuration → Environment variables**, each sensitive var (`DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_SECRET`, etc.) must include **Functions** in its scope (and **Builds** if used at build time). Variables scoped to **Builds only** are **not** visible to API routes — you get Prisma initialization errors and “Database unavailable” on register/login. The preview workflow uses `netlify env:set … --scope builds functions`.
+
 ### NextAuth on previews
 
 The **GitHub Action** runs `netlify env:set … --context deploy-preview` for **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`DATABASE_URL`**, and **`DIRECT_URL`** before `netlify deploy --build`. That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without `NEXTAUTH_SECRET` there, NextAuth returns a generic “server configuration” error. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).
