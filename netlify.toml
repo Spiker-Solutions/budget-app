@@ -8,16 +8,20 @@
 [context.production]
   command = "npx prisma migrate deploy && npm run build"
 
-# Used when Netlify builds a PR preview (e.g. `netlify deploy --build` from GitHub Actions).
-# Migrations run in CI before deploy — see https://neon.com/guides/preview-deploys-netlify
+# PR previews are deployed via GitHub Actions (Neon guide); migrations run in CI.
+# If Netlify ever builds deploy-preview from Git, same as default build.
 [context.deploy-preview]
-  command = "npx prisma generate && npm run build"
+  command = "npm run build"
 
 [context.branch-deploy]
   command = "npx prisma migrate deploy && npm run build"
 
 [build.environment]
   NODE_VERSION = "20"
+  # NextAuth (build only): Netlify does not inject [build.environment] into Functions at runtime.
+  # For production, set AUTH_TRUST_HOST=true in the Netlify UI (scope includes Functions).
+  # PR previews: .github/workflows/deploy-preview.yml sets it via netlify env:set.
+  AUTH_TRUST_HOST = "true"
   # NEXTAUTH_URL is a public origin (not a password). Next.js/NextAuth inlines it into
   # bundles, which Netlify secrets scanning would otherwise flag as a leak.
   SECRETS_SCAN_OMIT_KEYS = "NEXTAUTH_URL"
@@ -27,6 +31,10 @@
 
 [functions]
   node_bundler = "esbuild"
+  # Prisma: keep the query engine out of the esbuild bundle and ship it as a file
+  # (avoids "function has crashed" when the .so.node binary is missing at runtime).
+  external_node_modules = ["@prisma/client"]
+  included_files = ["node_modules/.prisma/client/**"]
 
 [[headers]]
   for = "/*"
