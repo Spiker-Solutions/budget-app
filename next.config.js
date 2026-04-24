@@ -8,7 +8,6 @@ const nextConfig = {
       "/api/**/*": [
         "./node_modules/.prisma/client/**/*",
         "./node_modules/@prisma/client/**/*",
-        "./src/generated/netlify-preview-env.json",
       ],
     },
   },

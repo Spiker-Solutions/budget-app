@@ -1,8 +1,5 @@
-# Neon + Netlify preview deploys (per PR database branch).
-# See: https://neon.com/guides/preview-deploys-netlify
-#
-# Requires Netlify "Deploy previews" set to None so this workflow is the only preview path.
-# Production deploys still run from Netlify’s Git integration as usual.
+# Matches https://neon.com/guides/preview-deploys-netlify
+# Netlify: Deploy previews = None; production env vars = Production context only.
 
 name: Deploy Preview
 
@@ -14,10 +11,9 @@ env:
   NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
   NEON_DATABASE_NAME: ${{ secrets.NEON_DATABASE_NAME }}
   NEON_DATABASE_USERNAME: ${{ secrets.NEON_DATABASE_USERNAME }}
-  # Neon DB branch to fork preview branches from (not production). Use a repo variable to override.
-  NEON_PREVIEW_PARENT: ${{ vars.NEON_PREVIEW_PARENT_BRANCH || 'development' }}
   NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
   NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  NEON_PREVIEW_PARENT: ${{ vars.NEON_PREVIEW_PARENT_BRANCH || 'development' }}
 
 jobs:
   deploy-preview:
@@ -40,8 +36,6 @@ jobs:
           project_id: ${{ env.NEON_PROJECT_ID }}
           database: ${{ env.NEON_DATABASE_NAME }}
           username: ${{ env.NEON_DATABASE_USERNAME }}
-          # Fork from staging-like branch so previews do not copy production data.
-          # https://github.com/neondatabase/create-branch-action — input is `parent` (v5).
           parent: ${{ env.NEON_PREVIEW_PARENT }}
           branch_name: preview/pr-${{ github.event.number }}-${{ steps.branch-name.outputs.current_branch }}
 
@@ -55,94 +49,49 @@ jobs:
         run: npm ci
 
       - name: Run migrations
-        run: npm run db:generate-migrate
+        run: npm run generate-migrate
         env:
           DIRECT_URL: ${{ steps.create-branch.outputs.db_url }}
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url_with_pooler }}
 
       - name: Install Netlify CLI
-        run: npm install -g netlify-cli@25
+        run: |
+          npm install -g netlify-cli
+          netlify link --id ${{ env.NETLIFY_SITE_ID }} --auth ${{ env.NETLIFY_AUTH_TOKEN }}
 
       - name: Deploy preview to Netlify
         id: deploy
         env:
-          # Subdomain is not secret; prefer Actions → Variables. If you used Secrets by mistake, we also read secrets.NETLIFY_SITE_SLUG (vars win if both set).
           NETLIFY_SITE_SLUG_OVERRIDE: ${{ vars.NETLIFY_SITE_SLUG || secrets.NETLIFY_SITE_SLUG }}
           NEXTAUTH_SECRET_CI: ${{ secrets.NEXTAUTH_SECRET }}
         run: |
           set -euo pipefail
           if [ -z "${NEXTAUTH_SECRET_CI:-}" ]; then
-            echo "::error::Set NEXTAUTH_SECRET in GitHub Actions secrets so the preview build can run (same value as Netlify production is fine)."
+            echo "::error::Add NEXTAUTH_SECRET to GitHub Actions secrets (same value as Netlify production)."
             exit 1
           fi
-
           if [ -n "${NETLIFY_SITE_SLUG_OVERRIDE:-}" ]; then
-            NETLIFY_SITE_SLUG="${NETLIFY_SITE_SLUG_OVERRIDE}"
+            SITE_SLUG="${NETLIFY_SITE_SLUG_OVERRIDE}"
           else
             SITE_JSON=$(curl -sSf -H "Authorization: Bearer ${{ env.NETLIFY_AUTH_TOKEN }}" \
               "https://api.netlify.com/api/v1/sites/${{ env.NETLIFY_SITE_ID }}")
-            NETLIFY_SITE_SLUG=$(echo "$SITE_JSON" | jq -r '.name // empty')
-            if [ -z "$NETLIFY_SITE_SLUG" ]; then
-              echo "::error::Could not read site name from Netlify API. Check NETLIFY_SITE_ID and NETLIFY_AUTH_TOKEN, or set NETLIFY_SITE_SLUG as a repository variable or secret (subdomain only, e.g. mrbudgets). Note: Secrets and Variables are separate — the workflow reads vars.NETLIFY_SITE_SLUG OR secrets.NETLIFY_SITE_SLUG."
+            SITE_SLUG=$(echo "$SITE_JSON" | jq -r '.name // empty')
+            if [ -z "$SITE_SLUG" ]; then
+              echo "::error::Set repository variable NETLIFY_SITE_SLUG (subdomain only, e.g. mrbudgets) or fix NETLIFY_SITE_ID / token."
               exit 1
             fi
           fi
+          PREVIEW_URL="https://pr-${{ github.event.number }}--${SITE_SLUG}.netlify.app"
 
-          netlify link --id "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
+          : > .env
+          netlify env:list --context deploy-preview --plain >> .env
+          echo "DIRECT_URL=${{ steps.create-branch.outputs.db_url }}" >> .env
+          echo "DATABASE_URL=${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
+          echo "NEXTAUTH_URL=${PREVIEW_URL}" >> .env
+          echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
+          echo "AUTH_TRUST_HOST=true" >> .env
 
-          PREVIEW_ORIGIN="https://pr-${{ github.event.number }}--${NETLIFY_SITE_SLUG}.netlify.app"
-          DB_DIRECT="${{ steps.create-branch.outputs.db_url }}"
-          DB_POOLER="${{ steps.create-branch.outputs.db_url_with_pooler }}"
-          AUTH="${{ env.NETLIFY_AUTH_TOKEN }}"
-          # CLI `netlify deploy --alias=pr-N` is not a Git PR preview; runtime often does NOT
-          # resolve the deploy-preview context. Mirror the same values to branch-deploy and
-          # branch:<head> so Functions get DATABASE_URL / NEXTAUTH_* (see Netlify CLI #6898).
-          HEAD_REF="${{ github.head_ref }}"
-          BRANCH_CTX="branch:${HEAD_REF}"
-
-          # Never use env:unset without --context: that wipes production. Only clear preview contexts.
-          for KEY in NEXTAUTH_SECRET AUTH_SECRET NEXTAUTH_URL DATABASE_URL DIRECT_URL AUTH_TRUST_HOST; do
-            netlify env:unset "$KEY" --context deploy-preview branch-deploy "$BRANCH_CTX" --force --auth "$AUTH" || true
-          done
-          netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview branch-deploy "$BRANCH_CTX" --scope builds functions runtime --force --auth "$AUTH"
-          netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview branch-deploy "$BRANCH_CTX" --scope builds functions runtime --force --auth "$AUTH"
-          netlify env:set NEXTAUTH_URL "${PREVIEW_ORIGIN}" --context deploy-preview branch-deploy "$BRANCH_CTX" --scope builds functions runtime --force --auth "$AUTH"
-          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview branch-deploy "$BRANCH_CTX" --scope builds functions runtime --secret --force --auth "$AUTH"
-          netlify env:set AUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview branch-deploy "$BRANCH_CTX" --scope builds functions runtime --secret --force --auth "$AUTH"
-          netlify env:set AUTH_TRUST_HOST "true" --context deploy-preview branch-deploy "$BRANCH_CTX" --scope builds functions runtime --force --auth "$AUTH"
-
-          # Also export to shell for the build process
-          export DATABASE_URL="${DB_POOLER}"
-          export DIRECT_URL="${DB_DIRECT}"
-          export NEXTAUTH_URL="${PREVIEW_ORIGIN}"
-          export NEXTAUTH_SECRET="${NEXTAUTH_SECRET_CI}"
-          export AUTH_SECRET="${NEXTAUTH_SECRET_CI}"
-          export AUTH_TRUST_HOST="true"
-
-          # Bundle DB + NEXTAUTH_URL for CLI alias deploys (Netlify often omits site env in Lambdas).
-          mkdir -p src/generated
-          jq -n \
-            --arg db "${DB_POOLER}" \
-            --arg direct "${DB_DIRECT}" \
-            --arg url "${PREVIEW_ORIGIN}" \
-            --arg secret "${NEXTAUTH_SECRET_CI}" \
-            '{mode: "netlify-cli-alias-preview", DATABASE_URL: $db, DIRECT_URL: $direct, NEXTAUTH_URL: $url, NEXTAUTH_SECRET: $secret, AUTH_TRUST_HOST: "true"}' \
-            > src/generated/netlify-preview-env.json
-
-          # Debug: show what Netlify has for all contexts
-          echo "=== Netlify env vars for deploy-preview context ==="
-          netlify env:list --context deploy-preview --auth "$AUTH" || true
-          echo "=== Netlify env vars for branch-deploy context ==="
-          netlify env:list --context branch-deploy --auth "$AUTH" || true
-          echo "=== Netlify env vars for branch:${HEAD_REF} ==="
-          netlify env:list --context "$BRANCH_CTX" --auth "$AUTH" || true
-          echo "=== Netlify env vars for production context ==="
-          netlify env:list --context production --auth "$AUTH" || true
-          echo "=== Shell DATABASE_URL ==="
-          echo "DATABASE_URL length: ${#DATABASE_URL}"
-
-          # Build and deploy. The env:set above configures runtime; export configures build.
-          netlify deploy --build --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
+          netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
           DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 

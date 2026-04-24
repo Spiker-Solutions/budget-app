@@ -1,170 +1,28 @@
 # Budget App
 
-A modern envelope budgeting application built with Next.js, Mantine, and Prisma.
+A collaborative budget tracking application built with Next.js, Mantine, Prisma, and PostgreSQL.
 
-## Features
+## Local development
 
-- **Envelope Budgeting**: Allocate your money into virtual envelopes for different spending categories
-- **Expense Tracking**: Log expenses and see exactly where your money goes
-- **Team Collaboration**: Share budgets with family members or partners
-- **Flexible Periods**: Weekly, bi-weekly, monthly, or custom budget periods
-- **Modern UI**: Built with Mantine components for a beautiful, responsive experience
+See [CLAUDE.md](./CLAUDE.md) for setup (Docker Postgres, env vars, Prisma, Netlify notes).
 
-## Tech Stack
+## PR previews: Neon + Netlify (official flow)
 
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **UI Components**: Mantine v7
-- **Styling**: Tailwind CSS (utilities only)
-- **State Management**: Zustand
-- **Database**: PostgreSQL
-- **ORM**: Prisma
-- **Authentication**: NextAuth.js
-- **Hosting**: Netlify
+This repo follows **[Automate preview deployments with Netlify and Neon](https://neon.com/guides/preview-deploys-netlify)**:
 
-## Getting Started
+1. **Netlify:** Site → Build & deploy → **Deploy previews: None** (Actions own previews).
+2. **Netlify:** Environment variables for **Production** only: `DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, optional Google OAuth, **`AUTH_TRUST_HOST=true`** with **Functions** scope where needed.
+3. **GitHub Actions secrets:** `NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_DATABASE_NAME`, `NEON_DATABASE_USERNAME`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`, **`NEXTAUTH_SECRET`** (same as production).
+4. **Optional:** Repository variable `NETLIFY_SITE_SLUG` (subdomain only, e.g. `mrbudgets`) if the workflow cannot resolve the site name from the API.
+5. **Optional:** `NEON_PREVIEW_PARENT_BRANCH` — Neon branch to fork preview DBs from (default `development`).
 
-### Prerequisites
+Workflows:
 
-- Node.js 20+
-- PostgreSQL database
-- npm or yarn
+- `.github/workflows/deploy-preview.yml` — creates a Neon branch, runs `npm run generate-migrate`, then `netlify deploy --context=deploy-preview` with a `.env` built from `netlify env:list` plus per-PR `DATABASE_URL` / `DIRECT_URL` / preview `NEXTAUTH_*`.
+- `.github/workflows/cleanup-preview.yml` — deletes the preview Neon branch when the PR closes.
 
-### Installation
+**Scripts (per Neon guide):** `generate-migrate` = `prisma generate && prisma migrate deploy`; `build` = `prisma generate && next build`.
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd budget-app
-   ```
+## Tech stack
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-
-   Edit `.env` with your database connection string and other secrets:
-   ```
-   DATABASE_URL="postgresql://user:password@localhost:5432/budget_app?schema=public"
-   NEXTAUTH_URL="http://localhost:3000"
-   NEXTAUTH_SECRET="your-secret-key"
-   GOOGLE_CLIENT_ID="your-google-client-id"
-   GOOGLE_CLIENT_SECRET="your-google-client-secret"
-   ```
-
-4. Run database migrations:
-   ```bash
-   npx prisma migrate dev
-   ```
-
-5. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-6. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Deployment on Netlify
-
-### Environment Variables
-
-Set these environment variables in your Netlify dashboard:
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (Neon: use the **pooled** URL for serverless) |
-| `DIRECT_URL` | Same database, **direct** (non-pooled) URL — required for `prisma migrate` (local: can match `DATABASE_URL`) |
-| `NEXTAUTH_URL` | Your production URL (e.g., `https://your-app.netlify.app`) |
-| `NEXTAUTH_SECRET` | Random secret (generate with `openssl rand -base64 32`) |
-| `AUTH_TRUST_HOST` | Set to `true` in the Netlify **dashboard** (include **Functions** scope) so NextAuth can derive the request origin when `x-forwarded-proto` is missing. `netlify.toml` alone does not pass this into Functions at runtime. |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID (optional) |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (optional) |
-
-### Deploy
-
-1. Push your code to GitHub
-2. Connect your repository to Netlify
-3. Netlify will automatically detect the Next.js configuration
-4. Set the environment variables in Netlify dashboard
-5. Deploy!
-
-### Database migrations on Netlify
-
-**Production** and **branch deploys** (if enabled in Netlify) run `npx prisma migrate deploy && npm run build` (see `netlify.toml`).
-
-Neon recommends a **separate Postgres branch per pull request**, with migrations run against that branch, then a preview deployed to Netlify. That flow is **not** a button in the Netlify UI; it is **GitHub Actions** + Neon’s API. Follow Neon’s guide (same flow as this repo’s workflows):
-
-- **[Automate preview deployments with Netlify and Neon](https://neon.com/guides/preview-deploys-netlify)**
-
-Summary of that approach:
-
-1. In Netlify, set **Deploy previews** to **None** (so Netlify does not build PRs on its own). Production still builds from your main branch as usual.
-2. Add GitHub **repository secrets** (`NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_DATABASE_NAME`, `NEON_DATABASE_USERNAME`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID`, **`NEXTAUTH_SECRET`**) as described in the guide. Previews need `NEXTAUTH_SECRET` during `netlify deploy --build` because NextAuth validates `NEXTAUTH_URL` at build time.
-
-3. Optional **`NETLIFY_SITE_SLUG`** (subdomain only, e.g. `mrbudgets`): use an Actions **variable** or **secret** with that exact name. GitHub keeps **Variables** and **Secrets** separate — the workflow uses **`vars.NETLIFY_SITE_SLUG || secrets.NETLIFY_SITE_SLUG`**. If unset, it loads the site name from the Netlify API (`NETLIFY_SITE_ID` + token). Preview origin: **`https://pr-<PR#>--<site-name>.netlify.app`**.
-4. On each PR, `.github/workflows/deploy-preview.yml` creates a **Neon branch**, runs **`npm run db:generate-migrate`** (migrations + generate), then **`netlify deploy --build`** with that branch’s pooled and direct URLs.
-5. When the PR closes, `.github/workflows/cleanup-preview.yml` deletes the Neon preview branch.
-
-This repo includes those workflows; enable them by adding the secrets. **Do not** point preview builds at your production `DATABASE_URL`.
-
-**Preview Neon branches fork from `development`**, not production (see `parent` in `deploy-preview.yml`). A Neon branch named **`development`** must exist; keep it free of real customer data (empty DB, seed data, or periodic reset). Override the parent name with a GitHub **repository variable** `NEON_PREVIEW_PARENT_BRANCH` if you use a different Neon branch.
-
-**Migrations and merging to `main`:** PR previews run `prisma migrate deploy` only on the **temporary preview** Neon branch. Merging the PR does **not** run those migrations on production by itself—production schema updates when a **production** deploy runs (e.g. Netlify build on `main`) with `migrate deploy` against your **production** Neon branch. Keep migration files in the PR as usual; after merge, deploy `main` so production applies the same migration history. Periodically refresh your **`development`** Neon branch (e.g. reset from `production` in Neon console, or re-run migrations) so it stays schema-aligned without carrying prod data you do not want copied.
-
-### Prisma + Neon: `DATABASE_URL` and `DIRECT_URL`
-
-`schema.prisma` uses **`directUrl`** for migrations. In Neon:
-
-- **`DATABASE_URL`**: pooled connection string (for the app at runtime).
-- **`DIRECT_URL`**: direct (non-pooled) connection string (for `prisma migrate`).
-
-For **local Docker**, set **`DIRECT_URL`** to the same value as **`DATABASE_URL`**.
-
-Set both in Netlify for **Production** (and any other context that runs migrations).
-
-The app adjusts pooled Neon URLs at runtime for Prisma on serverless (`pgbouncer=true`, `connect_timeout`, `connection_limit`) — see `src/lib/neon-db-url.ts`. You can still add these to `DATABASE_URL` in the Neon console if you prefer.
-
-`next.config.js` sets **`experimental.outputFileTracingIncludes`** for `/api/**/*` so the Prisma query engine is traced into Next’s server bundles. **`netlify.toml`** also sets **`functions.external_node_modules`** for `@prisma/client` and **`functions.included_files`** for `node_modules/.prisma/client/**` so esbuild does not strip the `.so.node` engine. Without these, `/api/auth/*` can crash at runtime with Netlify’s generic “function has crashed” page.
-
-**Netlify:** In **Site configuration → Environment variables**, each sensitive var (`DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_SECRET`, etc.) must include **Functions** in its scope (and **Builds** if used at build time). Variables scoped to **Builds only** are **not** visible to API routes — you get Prisma initialization errors and “Database unavailable” on register/login. The preview workflow sets **deploy-preview** values without `--scope` so Netlify applies **all scopes** (CLI errors if you combine `--scope` with `--context` when the key already exists in another context).
-
-### NextAuth on previews
-
-The **GitHub Action** runs `netlify env:set` for **`NEXTAUTH_SECRET`**, **`AUTH_SECRET`** (same value as `NEXTAUTH_SECRET`), **`NEXTAUTH_URL`**, **`DATABASE_URL`**, **`DIRECT_URL`**, and **`AUTH_TRUST_HOST=true`** on **`deploy-preview`**, **`branch-deploy`**, and **`branch:<PR head ref>`** before `netlify deploy --build`. CLI deploys with **`--alias pr-N`** often still omit site env in Lambdas ([netlify/cli#6898](https://github.com/netlify/cli/issues/6898)), so the workflow also writes **`src/generated/netlify-preview-env.json`** (Neon URLs + preview `NEXTAUTH_*`) before **`next build`**; `src/lib/netlify-preview-env-init.ts` applies it when **`mode`** is **`netlify-cli-alias-preview`**. The committed stub uses **`mode: "none"`** so local and normal Netlify Git builds are unchanged. Use **`env:unset` only with those preview contexts** (never site-wide) so production is not deleted.
-
-That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without a secret there, NextAuth returns a generic “server configuration” error. **`AUTH_TRUST_HOST`** avoids empty `req.origin` when Netlify omits `x-forwarded-proto`, which can otherwise crash sign-in. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).
-
-## Database Setup
-
-For production, you can use:
-- [Neon](https://neon.tech/) - Serverless PostgreSQL
-- [Supabase](https://supabase.com/) - Open source Firebase alternative
-- [Railway](https://railway.app/) - Infrastructure platform
-- [PlanetScale](https://planetscale.com/) - MySQL compatible (requires schema changes)
-
-## Project Structure
-
-```
-src/
-├── app/                    # Next.js App Router pages
-│   ├── (auth)/            # Auth pages (login, register)
-│   ├── (dashboard)/       # Protected dashboard pages
-│   └── api/               # API route handlers
-├── components/            # React components
-├── lib/                   # Utilities and configurations
-├── stores/               # Zustand stores
-└── types/                # TypeScript type definitions
-```
-
-## Contributing
-
-See [CLAUDE.md](./CLAUDE.md) for development guidelines.
-
-## License
-
-MIT
+- Next.js (App Router), TypeScript, Mantine v7, Zustand, Prisma, NextAuth.js, Netlify.

@@ -1,4 +1,3 @@
-import "./netlify-preview-env-init";
 import { PrismaClient } from "@prisma/client";
 import { prismaDatabaseUrl } from "./neon-db-url";
 

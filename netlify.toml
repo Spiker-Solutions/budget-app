@@ -8,10 +8,10 @@
 [context.production]
   command = "npx prisma migrate deploy && npm run build"
 
-# Used when Netlify builds a PR preview (e.g. `netlify deploy --build` from GitHub Actions).
-# Migrations run in CI before deploy — see https://neon.com/guides/preview-deploys-netlify
+# PR previews are deployed via GitHub Actions (Neon guide); migrations run in CI.
+# If Netlify ever builds deploy-preview from Git, same as default build.
 [context.deploy-preview]
-  command = "npx prisma generate && npm run build"
+  command = "npm run build"
 
 [context.branch-deploy]
   command = "npx prisma migrate deploy && npm run build"
