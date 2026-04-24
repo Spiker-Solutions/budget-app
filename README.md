@@ -135,7 +135,9 @@ The app adjusts pooled Neon URLs at runtime for Prisma on serverless (`pgbouncer
 
 ### NextAuth on previews
 
-The **GitHub Action** runs `netlify env:set … --context deploy-preview` for **`NEXTAUTH_SECRET`**, **`NEXTAUTH_URL`**, **`DATABASE_URL`**, **`DIRECT_URL`**, and **`AUTH_TRUST_HOST=true`** before `netlify deploy --build`. That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without `NEXTAUTH_SECRET` there, NextAuth returns a generic “server configuration” error. **`AUTH_TRUST_HOST`** avoids empty `req.origin` when Netlify omits `x-forwarded-proto`, which can otherwise crash sign-in. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).
+The **GitHub Action** runs `netlify env:set … --context deploy-preview` for **`NEXTAUTH_SECRET`**, **`AUTH_SECRET`** (same value as `NEXTAUTH_SECRET`; NextAuth falls back to it), **`NEXTAUTH_URL`**, **`DATABASE_URL`**, **`DIRECT_URL`**, and **`AUTH_TRUST_HOST=true`** before `netlify deploy --build`. Use **`env:unset` only with `--context deploy-preview`** so production variables are never deleted site-wide.
+
+That is required because a `.env` on the Actions runner only affects the **build**; **Netlify Functions** (e.g. `/api/auth/*`) read variables from the site’s **deploy-preview** env—without a secret there, NextAuth returns a generic “server configuration” error. **`AUTH_TRUST_HOST`** avoids empty `req.origin` when Netlify omits `x-forwarded-proto`, which can otherwise crash sign-in. Add **`GOOGLE_CLIENT_ID`** / **`GOOGLE_CLIENT_SECRET`** to Netlify’s **Deploy previews** context if you use Google on previews (the app only registers Google when both are set).
 
 ## Database Setup
 

@@ -61,7 +61,8 @@ providers.push(
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
-  secret: process.env.NEXTAUTH_SECRET,
+  // NextAuth also reads AUTH_SECRET; set both in Netlify for serverless quirks.
+  secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
   providers,
   session: {
     strategy: "jwt",

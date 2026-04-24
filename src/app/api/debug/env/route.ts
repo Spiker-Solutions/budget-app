@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+/** Must be dynamic: static generation would bake in build-time env, not Lambda runtime. */
+export const dynamic = "force-dynamic";
+
 /**
  * Diagnostic endpoint to check which env vars are available in the Netlify function runtime
  * and whether Prisma can connect.
