@@ -113,7 +113,12 @@ jobs:
           export NEXTAUTH_SECRET="${NEXTAUTH_SECRET_CI}"
           export AUTH_TRUST_HOST="true"
 
-          # Debug
+          # Debug: show what Netlify has for all contexts
+          echo "=== Netlify env vars for deploy-preview context ==="
+          netlify env:list --context deploy-preview --auth "$AUTH" || true
+          echo "=== Netlify env vars for production context ==="
+          netlify env:list --context production --auth "$AUTH" || true
+          echo "=== Shell DATABASE_URL ==="
           echo "DATABASE_URL length: ${#DATABASE_URL}"
 
           # Build and deploy. The env:set above configures runtime; export configures build.
