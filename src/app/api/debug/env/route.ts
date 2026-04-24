@@ -9,8 +9,13 @@ export async function GET() {
   const safeValue = (key: string) => {
     const val = process.env[key];
     if (!val) return "(not set)";
-    if (key.includes("SECRET") || key.includes("PASSWORD") || key === "DATABASE_URL" || key === "DIRECT_URL") {
+    if (key.includes("SECRET") || key.includes("PASSWORD")) {
       return `(set, length=${val.length})`;
+    }
+    // Show more of DB URLs to debug the issue (first 50 chars, mask password)
+    if (key === "DATABASE_URL" || key === "DIRECT_URL") {
+      const masked = val.replace(/:([^@]+)@/, ":****@");
+      return `(length=${val.length}) ${masked.slice(0, 80)}...`;
     }
     return val;
   };
