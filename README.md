@@ -128,6 +128,8 @@ Set both in Netlify for **Production** (and any other context that runs migratio
 
 The app adjusts pooled Neon URLs at runtime for Prisma on serverless (`pgbouncer=true`, `connect_timeout`, `connection_limit`) — see `src/lib/neon-db-url.ts`. You can still add these to `DATABASE_URL` in the Neon console if you prefer.
 
+`next.config.js` sets **`experimental.outputFileTracingIncludes`** for `/api/**/*` so the Prisma query engine under `node_modules/.prisma/client` is packaged into Netlify serverless functions. Without it, `/api/auth/*` can crash at runtime with Netlify’s generic “function has crashed” page.
+
 **Netlify:** In **Site configuration → Environment variables**, each sensitive var (`DATABASE_URL`, `DIRECT_URL`, `NEXTAUTH_SECRET`, etc.) must include **Functions** in its scope (and **Builds** if used at build time). Variables scoped to **Builds only** are **not** visible to API routes — you get Prisma initialization errors and “Database unavailable” on register/login. The preview workflow sets **deploy-preview** values without `--scope` so Netlify applies **all scopes** (CLI errors if you combine `--scope` with `--context` when the key already exists in another context).
 
 ### NextAuth on previews
