@@ -91,8 +91,8 @@ jobs:
           netlify link --id "${{ env.NETLIFY_SITE_ID }}" --auth "${{ env.NETLIFY_AUTH_TOKEN }}"
 
           PREVIEW_ORIGIN="https://pr-${{ github.event.number }}--${NETLIFY_SITE_SLUG}.netlify.app"
-          DB_DIRECT='${{ steps.create-branch.outputs.db_url }}'
-          DB_POOLER='${{ steps.create-branch.outputs.db_url_with_pooler }}'
+          DB_DIRECT="${{ steps.create-branch.outputs.db_url }}"
+          DB_POOLER="${{ steps.create-branch.outputs.db_url_with_pooler }}"
 
           # GitHub runner .env is only for the local build. API routes need env in Functions.
           # Omit --scope: Netlify defaults to all scopes (builds + functions + …) for new values.
