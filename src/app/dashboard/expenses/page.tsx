@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Title,
   Text,
   Card,
   Stack,
   Group,
+  Box,
   Button,
   Table,
   Badge,
@@ -20,14 +21,46 @@ import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { formatCurrency } from "@/lib/client-utils";
+import { resolveViewingPeriodForBudget } from "@/lib/budget-period";
+import { BudgetPeriodNavigator } from "@/components/budgets/BudgetPeriodNavigator";
 import dayjs from "dayjs";
 
 export default function ExpensesPage() {
   const { expenses, fetchExpenses, deleteExpense, isLoading } = useExpenseStore();
-  const { currentBudgetId } = useUiStore();
+  const { currentBudgetId, viewingPeriodStartMs } = useUiStore();
   const { budgets } = useBudgetStore();
 
   const currentBudget = budgets.find((b) => b.id === currentBudgetId);
+
+  const budgetInput = useMemo(() => {
+    if (!currentBudget) return null;
+    return {
+      periodType: currentBudget.periodType,
+      periodDay: currentBudget.periodDay ?? null,
+      customDays: currentBudget.customDays ?? null,
+      startDate: currentBudget.startDate ? new Date(currentBudget.startDate) : null,
+      createdAt: new Date(currentBudget.createdAt),
+      carryOverRemainder: currentBudget.carryOverRemainder,
+    };
+  }, [currentBudget]);
+
+  const viewingPeriod = useMemo(
+    () =>
+      budgetInput
+        ? resolveViewingPeriodForBudget(budgetInput, viewingPeriodStartMs)
+        : null,
+    [budgetInput, viewingPeriodStartMs]
+  );
+
+  const expensesInPeriod = useMemo(() => {
+    if (!viewingPeriod) return expenses;
+    const start = viewingPeriod.start.getTime();
+    const end = viewingPeriod.end.getTime();
+    return expenses.filter((e) => {
+      const t = new Date(e.date).getTime();
+      return t >= start && t <= end;
+    });
+  }, [expenses, viewingPeriod]);
 
   useEffect(() => {
     if (currentBudgetId) {
@@ -59,8 +92,13 @@ export default function ExpensesPage() {
         <div>
           <Title order={2}>Expenses</Title>
           <Text c="dimmed">
-            Track all your expenses for {currentBudget.name}
+            Expenses in this period for {currentBudget.name}
           </Text>
+          {budgetInput && (
+            <Box mt={4}>
+              <BudgetPeriodNavigator budgetInput={budgetInput} />
+            </Box>
+          )}
         </div>
         <Button
           component={Link}
@@ -79,17 +117,21 @@ export default function ExpensesPage() {
             <Skeleton height={40} />
           </Stack>
         </Card>
-      ) : expenses.length === 0 ? (
+      ) : expensesInPeriod.length === 0 ? (
         <Card withBorder p="xl">
           <Stack align="center">
-            <Text c="dimmed">No expenses yet</Text>
+            <Text c="dimmed">
+              {expenses.length === 0
+                ? "No expenses yet"
+                : "No expenses in this period"}
+            </Text>
             <Button
               component={Link}
               href="/dashboard/expenses/new"
               leftSection={<IconPlus size={18} />}
               variant="light"
             >
-              Add your first expense
+              {expenses.length === 0 ? "Add your first expense" : "Add expense"}
             </Button>
           </Stack>
         </Card>
@@ -107,7 +149,7 @@ export default function ExpensesPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {expenses.map((expense) => (
+              {expensesInPeriod.map((expense) => (
                 <Table.Tr key={expense.id}>
                   <Table.Td>
                     {dayjs(expense.date).format("MMM D, YYYY")}
@@ -176,12 +218,12 @@ export default function ExpensesPage() {
 
       <Group justify="space-between">
         <Text size="sm" c="dimmed">
-          Total: {expenses.length} expense{expenses.length !== 1 ? "s" : ""}
+          Total: {expensesInPeriod.length} expense{expensesInPeriod.length !== 1 ? "s" : ""} in this period
         </Text>
         <Text size="sm" fw={500}>
           Total spent:{" "}
           {formatCurrency(
-            expenses.reduce((sum, e) => sum + Number(e.amount), 0),
+            expensesInPeriod.reduce((sum, e) => sum + Number(e.amount), 0),
             currentBudget.currency
           )}
         </Text>

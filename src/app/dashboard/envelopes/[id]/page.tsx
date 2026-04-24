@@ -7,6 +7,7 @@ import {
   Card,
   Stack,
   Group,
+  Box,
   Button,
   Progress,
   Badge,
@@ -35,7 +36,12 @@ import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { formatCurrency } from "@/lib/client-utils";
-import { computeCarryAndPeriodTotals } from "@/lib/budget-period";
+import {
+  computeCarryAndPeriodTotalsForViewingPeriod,
+  resolveViewingPeriodForBudget,
+} from "@/lib/budget-period";
+import { BudgetPeriodNavigator } from "@/components/budgets/BudgetPeriodNavigator";
+import { useUiStore } from "@/stores/uiStore";
 import dayjs from "dayjs";
 
 export default function EnvelopeDetailPage({
@@ -50,6 +56,7 @@ export default function EnvelopeDetailPage({
   const [inviteLoading, setInviteLoading] = useState(false);
   const { expenses, fetchExpenses, deleteExpense } = useExpenseStore();
   const { budgets } = useBudgetStore();
+  const { viewingPeriodStartMs } = useUiStore();
 
   const inviteForm = useForm({
     initialValues: {
@@ -183,9 +190,9 @@ export default function EnvelopeDetailPage({
     [envelope, budgets]
   );
 
-  const periodTotals = useMemo(() => {
-    if (!envelope || !budget) return null;
-    const budgetInput = {
+  const budgetInput = useMemo(() => {
+    if (!budget) return null;
+    return {
       periodType: budget.periodType,
       periodDay: budget.periodDay ?? null,
       customDays: budget.customDays ?? null,
@@ -193,6 +200,28 @@ export default function EnvelopeDetailPage({
       createdAt: new Date(budget.createdAt),
       carryOverRemainder: budget.carryOverRemainder,
     };
+  }, [budget]);
+
+  const viewingPeriod = useMemo(
+    () =>
+      budgetInput
+        ? resolveViewingPeriodForBudget(budgetInput, viewingPeriodStartMs)
+        : null,
+    [budgetInput, viewingPeriodStartMs]
+  );
+
+  const expensesInPeriod = useMemo(() => {
+    if (!viewingPeriod) return expenses;
+    const start = viewingPeriod.start.getTime();
+    const end = viewingPeriod.end.getTime();
+    return expenses.filter((e) => {
+      const t = new Date(e.date).getTime();
+      return t >= start && t <= end;
+    });
+  }, [expenses, viewingPeriod]);
+
+  const periodTotals = useMemo(() => {
+    if (!envelope || !budgetInput || !viewingPeriod) return null;
     const envelopeInputs = [
       {
         id: envelope.id,
@@ -205,8 +234,13 @@ export default function EnvelopeDetailPage({
       date: new Date(e.date),
       amount: Number(e.amount),
     }));
-    return computeCarryAndPeriodTotals(budgetInput, envelopeInputs, expenseInputs);
-  }, [budget, envelope, expenses]);
+    return computeCarryAndPeriodTotalsForViewingPeriod(
+      budgetInput,
+      envelopeInputs,
+      expenseInputs,
+      viewingPeriod
+    );
+  }, [budgetInput, envelope, expenses, viewingPeriod]);
 
   if (loading) {
     return (
@@ -267,11 +301,10 @@ export default function EnvelopeDetailPage({
               {envelope.description && (
                 <Text c="dimmed">{envelope.description}</Text>
               )}
-              {periodTotals && (
-                <Text size="sm" c="dimmed" mt={4}>
-                  Current period: {dayjs(periodTotals.currentPeriod.start).format("MMM D, YYYY")} –{" "}
-                  {dayjs(periodTotals.currentPeriod.end).format("MMM D, YYYY")}
-                </Text>
+              {budgetInput && (
+                <Box mt={4}>
+                  <BudgetPeriodNavigator budgetInput={budgetInput} />
+                </Box>
               )}
             </div>
             <Badge
@@ -414,17 +447,21 @@ export default function EnvelopeDetailPage({
         </Button>
       </Group>
 
-      {expenses.length === 0 ? (
+      {expensesInPeriod.length === 0 ? (
         <Card withBorder p="xl">
           <Stack align="center">
-            <Text c="dimmed">No expenses in this envelope yet</Text>
+            <Text c="dimmed">
+              {expenses.length === 0
+                ? "No expenses in this envelope yet"
+                : "No expenses in this envelope for this period"}
+            </Text>
             <Button
               component={Link}
               href="/dashboard/expenses/new"
               leftSection={<IconPlus size={18} />}
               variant="light"
             >
-              Add your first expense
+              {expenses.length === 0 ? "Add your first expense" : "Add expense"}
             </Button>
           </Stack>
         </Card>
@@ -441,7 +478,7 @@ export default function EnvelopeDetailPage({
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {expenses.map((expense) => (
+              {expensesInPeriod.map((expense) => (
                 <Table.Tr key={expense.id}>
                   <Table.Td>
                     {dayjs(expense.date).format("MMM D, YYYY")}

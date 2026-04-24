@@ -189,6 +189,74 @@ export function getPreviousPeriod(
   return prev;
 }
 
+export function getNextPeriod(
+  current: PeriodBounds,
+  budget: BudgetPeriodInput
+): PeriodBounds | null {
+  const probe = new Date(current.end.getTime() + 1);
+  const next = getPeriodContaining(probe, budget);
+  if (next.start.getTime() <= current.start.getTime()) {
+    return null;
+  }
+  return next;
+}
+
+export type BuildBudgetPeriodWindowOptions = {
+  maxFuturePeriods?: number;
+  now?: Date;
+};
+
+/**
+ * Chronological list of periods from the first that overlaps the budget anchor
+ * through calendar current, plus up to `maxFuturePeriods` future periods (default 12).
+ */
+/**
+ * Maps store state to the active period bounds. `null` means calendar current as of `now`.
+ */
+export function resolveViewingPeriodForBudget(
+  budget: BudgetPeriodInput,
+  viewingPeriodStartMs: number | null,
+  now: Date = new Date()
+): PeriodBounds {
+  if (viewingPeriodStartMs === null) {
+    return getPeriodContaining(now, budget);
+  }
+  return getPeriodContaining(new Date(viewingPeriodStartMs), budget);
+}
+
+export function buildBudgetPeriodWindow(
+  budget: BudgetPeriodInput,
+  options?: BuildBudgetPeriodWindowOptions
+): PeriodBounds[] {
+  const maxFuture = options?.maxFuturePeriods ?? 12;
+  const now = options?.now ?? new Date();
+  const anchor = budgetAnchor(budget);
+  const calendarCurrent = getPeriodContaining(now, budget);
+
+  const periods: PeriodBounds[] = [];
+  let cur = calendarCurrent;
+  while (true) {
+    periods.unshift(cur);
+    const prev = getPreviousPeriod(cur, budget);
+    if (!prev || prev.end.getTime() < anchor.getTime()) {
+      break;
+    }
+    cur = prev;
+  }
+
+  let tail = calendarCurrent;
+  for (let i = 0; i < maxFuture; i++) {
+    const next = getNextPeriod(tail, budget);
+    if (!next) {
+      break;
+    }
+    periods.push(next);
+    tail = next;
+  }
+
+  return periods;
+}
+
 export function sumExpensesInRange(
   expenses: ExpenseInPeriodInput[],
   range: PeriodBounds,
@@ -223,14 +291,13 @@ function shouldApplyCarryFromPrevious(
   return previousPeriod.end.getTime() >= budgetStart.getTime();
 }
 
-export function computeCarryAndPeriodTotals(
+export function computeCarryAndPeriodTotalsForViewingPeriod(
   budget: BudgetPeriodInput,
   envelopes: EnvelopeCarryInput[],
   expenses: ExpenseInPeriodInput[],
-  referenceDate: Date = new Date()
+  viewingPeriod: PeriodBounds
 ): BudgetPeriodTotals {
-  const currentPeriod = getPeriodContaining(referenceDate, budget);
-  const previousPeriod = getPreviousPeriod(currentPeriod, budget);
+  const previousPeriod = getPreviousPeriod(viewingPeriod, budget);
   const applyCarry = shouldApplyCarryFromPrevious(budget, previousPeriod);
 
   const envelopeTotals: EnvelopePeriodTotals[] = envelopes.map((env) => {
@@ -242,7 +309,7 @@ export function computeCarryAndPeriodTotals(
       carriedFromPrior = Math.max(0, baseAllocation - spentPrior);
     }
     const availableThisPeriod = baseAllocation + carriedFromPrior;
-    const spentThisPeriod = sumExpensesInRange(expenses, currentPeriod, env.id);
+    const spentThisPeriod = sumExpensesInRange(expenses, viewingPeriod, env.id);
     const remainingThisPeriod = availableThisPeriod - spentThisPeriod;
 
     return {
@@ -263,7 +330,7 @@ export function computeCarryAndPeriodTotals(
   const totalRemainingThisPeriod = envelopeTotals.reduce((s, e) => s + e.remainingThisPeriod, 0);
 
   return {
-    currentPeriod,
+    currentPeriod: viewingPeriod,
     previousPeriod,
     envelopeTotals,
     totalBaseAllocation,
@@ -272,4 +339,18 @@ export function computeCarryAndPeriodTotals(
     totalSpentThisPeriod,
     totalRemainingThisPeriod,
   };
+}
+
+export function computeCarryAndPeriodTotals(
+  budget: BudgetPeriodInput,
+  envelopes: EnvelopeCarryInput[],
+  expenses: ExpenseInPeriodInput[],
+  referenceDate: Date = new Date()
+): BudgetPeriodTotals {
+  return computeCarryAndPeriodTotalsForViewingPeriod(
+    budget,
+    envelopes,
+    expenses,
+    getPeriodContaining(referenceDate, budget)
+  );
 }

@@ -13,6 +13,7 @@ import {
   Skeleton,
   Badge,
   ThemeIcon,
+  Box,
 } from "@mantine/core";
 import { IconPlus, IconWallet, IconReceipt } from "@tabler/icons-react";
 import Link from "next/link";
@@ -22,16 +23,17 @@ import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
 import { formatCurrency } from "@/lib/client-utils";
 import {
-  computeCarryAndPeriodTotals,
+  computeCarryAndPeriodTotalsForViewingPeriod,
+  resolveViewingPeriodForBudget,
   type EnvelopePeriodTotals,
 } from "@/lib/budget-period";
-import dayjs from "dayjs";
+import { BudgetPeriodNavigator } from "@/components/budgets/BudgetPeriodNavigator";
 
 export default function DashboardPage() {
   const { budgets, isLoading: budgetsLoading } = useBudgetStore();
   const { envelopes, fetchEnvelopes, isLoading: envelopesLoading } = useEnvelopeStore();
   const { expenses, fetchExpenses } = useExpenseStore();
-  const { currentBudgetId } = useUiStore();
+  const { currentBudgetId, viewingPeriodStartMs } = useUiStore();
 
   const currentBudget = useMemo(
     () => budgets.find((b) => b.id === currentBudgetId),
@@ -50,9 +52,9 @@ export default function DashboardPage() {
     [envelopes]
   );
 
-  const periodTotals = useMemo(() => {
+  const budgetInput = useMemo(() => {
     if (!currentBudget) return null;
-    const budgetInput = {
+    return {
       periodType: currentBudget.periodType,
       periodDay: currentBudget.periodDay ?? null,
       customDays: currentBudget.customDays ?? null,
@@ -60,6 +62,11 @@ export default function DashboardPage() {
       createdAt: new Date(currentBudget.createdAt),
       carryOverRemainder: currentBudget.carryOverRemainder,
     };
+  }, [currentBudget]);
+
+  const periodTotals = useMemo(() => {
+    if (!budgetInput) return null;
+    const viewingPeriod = resolveViewingPeriodForBudget(budgetInput, viewingPeriodStartMs);
     const envelopeInputs = envelopes.map((e) => ({
       id: e.id,
       allocation: Number(e.allocation),
@@ -70,8 +77,13 @@ export default function DashboardPage() {
       date: new Date(e.date),
       amount: Number(e.amount),
     }));
-    return computeCarryAndPeriodTotals(budgetInput, envelopeInputs, expenseInputs);
-  }, [currentBudget, envelopes, expenses]);
+    return computeCarryAndPeriodTotalsForViewingPeriod(
+      budgetInput,
+      envelopeInputs,
+      expenseInputs,
+      viewingPeriod
+    );
+  }, [budgetInput, envelopes, expenses, viewingPeriodStartMs]);
 
   const envelopeTotalsById = useMemo(() => {
     const m = new Map<string, EnvelopePeriodTotals>();
@@ -135,11 +147,10 @@ export default function DashboardPage() {
         <div>
           <Title order={2}>{currentBudget.name}</Title>
           <Text c="dimmed">{currentBudget.description || "Your budget"}</Text>
-          {periodTotals && (
-            <Text size="sm" c="dimmed" mt={4}>
-              Current period: {dayjs(periodTotals.currentPeriod.start).format("MMM D, YYYY")} –{" "}
-              {dayjs(periodTotals.currentPeriod.end).format("MMM D, YYYY")}
-            </Text>
+          {budgetInput && (
+            <Box mt={4}>
+              <BudgetPeriodNavigator budgetInput={budgetInput} />
+            </Box>
           )}
         </div>
         <Group>
