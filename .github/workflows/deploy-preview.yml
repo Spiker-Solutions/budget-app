@@ -94,30 +94,31 @@ jobs:
           DB_DIRECT="${{ steps.create-branch.outputs.db_url }}"
           DB_POOLER="${{ steps.create-branch.outputs.db_url_with_pooler }}"
 
-          # GitHub runner .env is only for the local build. API routes need env in Functions.
-          # Omit --scope: Netlify defaults to all scopes (builds + functions + …) for new values.
-          # Using --context and --scope together on a key that already exists (e.g. production) fails:
-          # "Setting the context and scope at the same time on an existing env var is not allowed."
-          # @see https://docs.netlify.com/build/functions/environment-variables/
-          AUTH="${{ env.NETLIFY_AUTH_TOKEN }}"
-          for KEY in NEXTAUTH_SECRET NEXTAUTH_URL DATABASE_URL DIRECT_URL AUTH_TRUST_HOST; do
-            netlify env:unset "$KEY" --context deploy-preview --force --auth "$AUTH" || true
-          done
-          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview --secret --force --auth "$AUTH"
-          netlify env:set NEXTAUTH_URL "${PREVIEW_ORIGIN}" --context deploy-preview --force --auth "$AUTH"
-          netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview --force --auth "$AUTH"
-          netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview --force --auth "$AUTH"
-          netlify env:set AUTH_TRUST_HOST "true" --context deploy-preview --force --auth "$AUTH"
+          # Write .env so Next.js build has access to these values.
+          # The .env is read at build time for static generation and bundling.
+          cat > .env << ENVEOF
+          DATABASE_URL=${DB_POOLER}
+          DIRECT_URL=${DB_DIRECT}
+          NEXTAUTH_URL=${PREVIEW_ORIGIN}
+          NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}
+          AUTH_TRUST_HOST=true
+          ENVEOF
 
-          : > .env
-          netlify env:list --context deploy-preview --plain >> .env || true
-          echo "DIRECT_URL=${DB_DIRECT}" >> .env
-          echo "DATABASE_URL=${DB_POOLER}" >> .env
-          echo "NEXTAUTH_URL=${PREVIEW_ORIGIN}" >> .env
-          echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
-          echo "AUTH_TRUST_HOST=true" >> .env
+          # Also export to shell so the build subprocess sees them
+          export DATABASE_URL="${DB_POOLER}"
+          export DIRECT_URL="${DB_DIRECT}"
+          export NEXTAUTH_URL="${PREVIEW_ORIGIN}"
+          export NEXTAUTH_SECRET="${NEXTAUTH_SECRET_CI}"
+          export AUTH_TRUST_HOST="true"
 
-          netlify deploy --build --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
+          # Debug: confirm the values are correct before build
+          echo "DATABASE_URL length: ${#DATABASE_URL}"
+          echo "DATABASE_URL prefix: ${DATABASE_URL:0:30}..."
+
+          # Build locally with env vars in shell, then deploy the built output.
+          # Using --dir (not --build) so Netlify doesn't re-run the build with its own env context.
+          npm run build
+          netlify deploy --dir=.next --functions=.netlify/functions-internal --alias="pr-${{ github.event.number }}" --json > netlify-deploy.json
           DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 

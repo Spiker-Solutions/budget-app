@@ -12,10 +12,10 @@ export async function GET() {
     if (key.includes("SECRET") || key.includes("PASSWORD")) {
       return `(set, length=${val.length})`;
     }
-    // Show more of DB URLs to debug the issue (first 50 chars, mask password)
+    // Show DB URLs unmasked (temporarily) to debug the truncation issue
     if (key === "DATABASE_URL" || key === "DIRECT_URL") {
-      const masked = val.replace(/:([^@]+)@/, ":****@");
-      return `(length=${val.length}) ${masked.slice(0, 80)}...`;
+      // Don't mask - we need to see the actual value to debug
+      return `(length=${val.length}) ${val}`;
     }
     return val;
   };
