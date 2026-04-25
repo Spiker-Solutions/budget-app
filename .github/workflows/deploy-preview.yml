@@ -86,7 +86,7 @@ jobs:
           DB_POOLER="${{ steps.create-branch.outputs.db_url_with_pooler }}"
           AUTH="${{ env.NETLIFY_AUTH_TOKEN }}"
 
-          # 1) Neon guide: .env for the `netlify deploy` build on the runner
+          # --- Neon guide: .env for netlify deploy ---
           : > .env
           netlify env:list --context deploy-preview --plain >> .env
           echo "DIRECT_URL=${DB_DIRECT}" >> .env
@@ -95,19 +95,22 @@ jobs:
           echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
           echo "AUTH_TRUST_HOST=true" >> .env
 
-          # 2) `netlify deploy --alias=pr-N` does not always inject .env into Functions at runtime.
-          # Push the same values to the site's deploy-preview context. Unset first, then set
-          # *without* --scope to avoid: "context and scope at the same time on an existing var".
-          for KEY in DIRECT_URL DATABASE_URL NEXTAUTH_URL NEXTAUTH_SECRET AUTH_TRUST_HOST; do
-            netlify env:unset "$KEY" --context deploy-preview --force --auth "$AUTH" || true
-          done
+          export DATABASE_URL="${DB_POOLER}"
+          export DIRECT_URL="${DB_DIRECT}"
+          export NEXTAUTH_URL="${PREVIEW_URL}"
+          export NEXTAUTH_SECRET="${NEXTAUTH_SECRET_CI}"
+          export AUTH_TRUST_HOST="true"
+
+          # Netlify: "Changes will require a redeploy" after env:set — wait so the next deploy picks up vars.
           netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview --force --auth "$AUTH"
           netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview --force --auth "$AUTH"
           netlify env:set NEXTAUTH_URL "${PREVIEW_URL}" --context deploy-preview --force --auth "$AUTH"
           netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview --secret --force --auth "$AUTH"
           netlify env:set AUTH_TRUST_HOST "true" --context deploy-preview --force --auth "$AUTH"
+          echo "Waiting for Netlify to apply deploy-preview env before deploy..."
+          sleep 45
 
-          netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
+          netlify deploy --build --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
           DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
