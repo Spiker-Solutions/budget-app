@@ -51,6 +51,22 @@ jobs:
       - name: Install Netlify CLI
         run: npm install -g netlify-cli && netlify link --id ${{ env.NETLIFY_SITE_ID }} --auth ${{ env.NETLIFY_AUTH_TOKEN }}
 
+      # TODO: remove after preview env issues are fixed
+      - name: "DEBUG: what GitHub passes into the deploy step (temporary)"
+        env:
+          NEXTAUTH_HOST_SUFFIX: ${{ secrets.NEXTAUTH_URL }}
+          NEXTAUTH_SECRET_CI: ${{ secrets.NEXTAUTH_SECRET }}
+        run: |
+          echo "========== DEBUG: secrets / env (temporary) =========="
+          echo "github.event.number=${{ github.event.number }}"
+          echo "NEON_PROJECT_ID length: ${#NEON_PROJECT_ID}"
+          echo "NETLIFY_SITE_ID length: ${#NETLIFY_SITE_ID}"
+          echo "NETLIFY_AUTH_TOKEN length: ${#NETLIFY_AUTH_TOKEN}"
+          echo "NEXTAUTH_URL secret -> NEXTAUTH_HOST_SUFFIX length: ${#NEXTAUTH_HOST_SUFFIX}"
+          echo "NEXTAUTH_URL secret -> NEXTAUTH_HOST_SUFFIX value: ${NEXTAUTH_HOST_SUFFIX}"
+          echo "NEXTAUTH_SECRET_CI length: ${#NEXTAUTH_SECRET_CI} (value omitted)"
+          echo "========================================================"
+
       - name: Deploy Preview to Netlify with CLI
         id: deploy
         env:
@@ -79,6 +95,11 @@ jobs:
           PREVIEW_URL="https://pr-${PR_NUM}--${HOST_SUFFIX}"
           export PREVIEW_URL
 
+          echo "========== DEBUG: computed preview URL (temporary) =========="
+          echo "HOST_SUFFIX=$HOST_SUFFIX"
+          echo "PREVIEW_URL=$PREVIEW_URL"
+          echo "============================================================"
+
           netlify env:list --context deploy-preview --plain >> .env
           echo DIRECT_URL="${{ steps.create-branch.outputs.db_url }}" >> .env
           echo DATABASE_URL="${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
@@ -93,6 +114,26 @@ jobs:
             fs.appendFileSync(path, 'NEXTAUTH_SECRET=' + process.env.NEXTAUTH_SECRET_CI + '\n');
             fs.appendFileSync(path, 'AUTH_TRUST_HOST=true\n');
           "
+
+          echo "========== DEBUG: .env as seen before netlify deploy (temporary) =========="
+          node -e "
+            const fs = require('fs');
+            const redactKey = (k) =>
+              /SECRET|DATABASE|DIRECT|PASSWORD|KEY|TOKEN|API/i.test(k);
+            const text = fs.readFileSync('.env', 'utf8');
+            for (const line of text.split(/\r?\n/)) {
+              if (!line.trim()) continue;
+              const eq = line.indexOf('=');
+              if (eq === -1) { console.log(line); continue; }
+              const k = line.slice(0, eq);
+              const v = line.slice(eq + 1);
+              if (redactKey(k))
+                console.log(k + '=<redacted len=' + v.length + '>');
+              else
+                console.log(k + '=' + v);
+            }
+          "
+          echo "============================================================================="
 
           netlify deploy --alias="pr-${PR_NUM}" --context=deploy-preview --json > netlify-deploy.json
 
