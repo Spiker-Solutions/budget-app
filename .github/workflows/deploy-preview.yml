@@ -89,18 +89,26 @@ jobs:
           HEAD_REF="${{ github.head_ref }}"
 
           # Always use --site + --auth so the Netlify *dashboard* and CI target the same site.
+          # Netlify scopes: without --scope, vars may be applied to builds but not to Functions/SSR
+          # (serverless), so process.env.DATABASE_URL is empty at runtime and Prisma can't connect.
+          NETLIFY_SCOPES=(--scope builds functions runtime)
           set_preview_env() {
             local CTX="$1"
-            netlify env:set DIRECT_URL "$DB_DIRECT" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
-            netlify env:set DATABASE_URL "$DB_POOLER" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
-            netlify env:set NEXTAUTH_URL "$PREVIEW_URL" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
-            netlify env:set AUTH_TRUST_HOST "true" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
-            netlify env:set NEXTAUTH_SECRET "$NEXTAUTH_SECRET_CI" --context "$CTX" --secret --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set DIRECT_URL "$DB_DIRECT" --context "$CTX" "${NETLIFY_SCOPES[@]}" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set DATABASE_URL "$DB_POOLER" --context "$CTX" "${NETLIFY_SCOPES[@]}" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set NEXTAUTH_URL "$PREVIEW_URL" --context "$CTX" "${NETLIFY_SCOPES[@]}" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set AUTH_TRUST_HOST "true" --context "$CTX" "${NETLIFY_SCOPES[@]}" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set NEXTAUTH_SECRET "$NEXTAUTH_SECRET_CI" --context "$CTX" --secret "${NETLIFY_SCOPES[@]}" --force --site "$SITE_ID" --auth "$AUTH"
           }
 
-          # --- Neon guide: .env for netlify deploy on the runner ---
+          # In Netlify UI: Environment variables → "Deploy Previews" and branch-specific values.
+          # CLI `netlify deploy --alias=pr-N` can resolve `branch:…` context — mirror to both.
+          set_preview_env "deploy-preview"
+          set_preview_env "branch:${HEAD_REF}"
+
+          # .env for `netlify deploy --build` on the runner only. Do not merge `netlify env:list`
+          # into this file: Next/Vite load first value per key, so a stale DATABASE_URL could win.
           : > .env
-          netlify env:list --context deploy-preview --plain --site "$SITE_ID" --auth "$AUTH" >> .env
           echo "DIRECT_URL=${DB_DIRECT}" >> .env
           echo "DATABASE_URL=${DB_POOLER}" >> .env
           echo "NEXTAUTH_URL=${PREVIEW_URL}" >> .env
@@ -112,11 +120,6 @@ jobs:
           export NEXTAUTH_URL="${PREVIEW_URL}"
           export NEXTAUTH_SECRET="${NEXTAUTH_SECRET_CI}"
           export AUTH_TRUST_HOST="true"
-
-          # In Netlify UI: Environment variables → "Deploy Previews" and branch-specific values.
-          # CLI `netlify deploy --alias=pr-N` can resolve `branch:…` context — mirror to both.
-          set_preview_env "deploy-preview"
-          set_preview_env "branch:${HEAD_REF}"
 
           echo "Waiting 45s for Netlify to apply site env (required before deploy)..."
           sleep 45
