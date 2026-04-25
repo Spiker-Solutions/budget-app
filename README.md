@@ -18,7 +18,7 @@ This repo follows **[Automate preview deployments with Netlify and Neon](https:/
 
 Workflows:
 
-- `.github/workflows/deploy-preview.yml` — [Neon guide](https://neon.com/guides/preview-deploys-netlify) flow (Neon branch, migrations, `env:list` + DB in `.env`, NextAuth in `.env`), `netlify env:set` for deploy-preview, **45s wait** (Netlify applies env before the next deploy), then **`netlify deploy --build`**.
+- `.github/workflows/deploy-preview.yml` — [Neon guide](https://neon.com/guides/preview-deploys-netlify) flow, then **`netlify env:set` with `--site` & `--auth`** (same app as the Netlify UI), for **`deploy-preview`** and **`branch:<PR head ref>`** so the dashboard shows one row per key under **Deploy previews** and under **this branch** (per-PR `NEXTAUTH_URL` + Neon URLs). **45s wait** then **`netlify deploy --build`**.
 - `.github/workflows/cleanup-preview.yml` — deletes the preview Neon branch when the PR closes.
 
 **Scripts (per Neon guide):** `generate-migrate` = `prisma generate && prisma migrate deploy`; `build` = `prisma generate && next build`.

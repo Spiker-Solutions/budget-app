@@ -85,10 +85,22 @@ jobs:
           DB_DIRECT="${{ steps.create-branch.outputs.db_url }}"
           DB_POOLER="${{ steps.create-branch.outputs.db_url_with_pooler }}"
           AUTH="${{ env.NETLIFY_AUTH_TOKEN }}"
+          SITE_ID="${{ env.NETLIFY_SITE_ID }}"
+          HEAD_REF="${{ github.head_ref }}"
 
-          # --- Neon guide: .env for netlify deploy ---
+          # Always use --site + --auth so the Netlify *dashboard* and CI target the same site.
+          set_preview_env() {
+            local CTX="$1"
+            netlify env:set DIRECT_URL "$DB_DIRECT" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set DATABASE_URL "$DB_POOLER" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set NEXTAUTH_URL "$PREVIEW_URL" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set AUTH_TRUST_HOST "true" --context "$CTX" --force --site "$SITE_ID" --auth "$AUTH"
+            netlify env:set NEXTAUTH_SECRET "$NEXTAUTH_SECRET_CI" --context "$CTX" --secret --force --site "$SITE_ID" --auth "$AUTH"
+          }
+
+          # --- Neon guide: .env for netlify deploy on the runner ---
           : > .env
-          netlify env:list --context deploy-preview --plain >> .env
+          netlify env:list --context deploy-preview --plain --site "$SITE_ID" --auth "$AUTH" >> .env
           echo "DIRECT_URL=${DB_DIRECT}" >> .env
           echo "DATABASE_URL=${DB_POOLER}" >> .env
           echo "NEXTAUTH_URL=${PREVIEW_URL}" >> .env
@@ -101,16 +113,18 @@ jobs:
           export NEXTAUTH_SECRET="${NEXTAUTH_SECRET_CI}"
           export AUTH_TRUST_HOST="true"
 
-          # Netlify: "Changes will require a redeploy" after env:set — wait so the next deploy picks up vars.
-          netlify env:set DIRECT_URL "${DB_DIRECT}" --context deploy-preview --force --auth "$AUTH"
-          netlify env:set DATABASE_URL "${DB_POOLER}" --context deploy-preview --force --auth "$AUTH"
-          netlify env:set NEXTAUTH_URL "${PREVIEW_URL}" --context deploy-preview --force --auth "$AUTH"
-          netlify env:set NEXTAUTH_SECRET "${NEXTAUTH_SECRET_CI}" --context deploy-preview --secret --force --auth "$AUTH"
-          netlify env:set AUTH_TRUST_HOST "true" --context deploy-preview --force --auth "$AUTH"
-          echo "Waiting for Netlify to apply deploy-preview env before deploy..."
+          # In Netlify UI: Environment variables → "Deploy Previews" and branch-specific values.
+          # CLI `netlify deploy --alias=pr-N` can resolve `branch:…` context — mirror to both.
+          set_preview_env "deploy-preview"
+          set_preview_env "branch:${HEAD_REF}"
+
+          echo "Waiting 45s for Netlify to apply site env (required before deploy)..."
           sleep 45
 
-          netlify deploy --build --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
+          echo "=== Variable names present for deploy-preview on site $SITE_ID (values redacted) ==="
+          netlify env:list --context deploy-preview --plain --site "$SITE_ID" --auth "$AUTH" | cut -d= -f1 | sort -u
+
+          netlify deploy --build --alias="pr-${{ github.event.number }}" --context=deploy-preview --site "$SITE_ID" --auth "$AUTH" --json > netlify-deploy.json
           DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
