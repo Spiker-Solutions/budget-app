@@ -1,7 +1,4 @@
-# Deletes the Neon database branch when the PR closes.
-# Branch name must match deploy-preview.yml (Neon create-branch-action).
-
-name: Delete preview Neon branch
+name: Delete Preview Branch on Neon
 
 on:
   pull_request:
@@ -15,12 +12,9 @@ jobs:
   delete-preview:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - uses: oven-sh/setup-bun@v2
 
-      # Branch name must match deploy-preview.yml (Neon create-branch-action).
-      - name: Delete Neon branch
-        run: npx neonctl@latest branches delete "preview/pr-${{ github.event.number }}-${{ github.head_ref }}" --project-id "${{ env.NEON_PROJECT_ID }}"
+      - name: Delete Neon Branch
+        run: bunx neonctl branches delete preview/pr-${{ github.event.number }}-${{ github.event.pull_request.head.ref }} --project-id ${{ vars.NEON_PROJECT_ID }}
         env:
-          NEON_API_KEY: ${{ env.NEON_API_KEY }}
+          api_key: ${{ env.NEON_API_KEY }}

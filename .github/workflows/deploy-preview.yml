@@ -1,10 +1,6 @@
-# Matches https://neon.com/guides/preview-deploys-netlify
-# Netlify: Deploy previews = None; production env vars = Production context only.
-
 name: Deploy Preview
 
-on:
-  pull_request:
+on: [pull_request]
 
 env:
   NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -13,13 +9,10 @@ env:
   NEON_DATABASE_USERNAME: ${{ secrets.NEON_DATABASE_USERNAME }}
   NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
   NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-  NEON_PREVIEW_PARENT: ${{ vars.NEON_PREVIEW_PARENT_BRANCH || 'development' }}
 
 jobs:
   deploy-preview:
-    permissions:
-      contents: read
-      pull-requests: write
+    permissions: write-all
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +21,7 @@ jobs:
         id: branch-name
         uses: tj-actions/branch-names@v8
 
-      - name: Create Neon branch
+      - name: Create Neon Branch
         id: create-branch
         uses: neondatabase/create-branch-action@v5
         with:
@@ -36,72 +29,50 @@ jobs:
           project_id: ${{ env.NEON_PROJECT_ID }}
           database: ${{ env.NEON_DATABASE_NAME }}
           username: ${{ env.NEON_DATABASE_USERNAME }}
-          parent: ${{ env.NEON_PREVIEW_PARENT }}
           branch_name: preview/pr-${{ github.event.number }}-${{ steps.branch-name.outputs.current_branch }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: '20'
+          cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-      - name: Run migrations
+      - name: Run Migrations
         run: npm run generate-migrate
         env:
           DIRECT_URL: ${{ steps.create-branch.outputs.db_url }}
           DATABASE_URL: ${{ steps.create-branch.outputs.db_url_with_pooler }}
 
       - name: Install Netlify CLI
-        run: |
-          npm install -g netlify-cli
-          netlify link --id ${{ env.NETLIFY_SITE_ID }} --auth ${{ env.NETLIFY_AUTH_TOKEN }}
+        run: npm install -g netlify-cli && netlify link --id ${{ env.NETLIFY_SITE_ID }} --auth ${{ env.NETLIFY_AUTH_TOKEN }}
 
-      - name: Deploy preview to Netlify
+      - name: Deploy Preview to Netlify with CLI
         id: deploy
-        env:
-          NETLIFY_SITE_SLUG_OVERRIDE: ${{ vars.NETLIFY_SITE_SLUG || secrets.NETLIFY_SITE_SLUG }}
-          NEXTAUTH_SECRET_CI: ${{ secrets.NEXTAUTH_SECRET }}
         run: |
-          set -euo pipefail
-          if [ -z "${NEXTAUTH_SECRET_CI:-}" ]; then
-            echo "::error::Add NEXTAUTH_SECRET to GitHub Actions secrets (same value as Netlify production)."
-            exit 1
-          fi
-          if [ -n "${NETLIFY_SITE_SLUG_OVERRIDE:-}" ]; then
-            SITE_SLUG="${NETLIFY_SITE_SLUG_OVERRIDE}"
-          else
-            SITE_JSON=$(curl -sSf -H "Authorization: Bearer ${{ env.NETLIFY_AUTH_TOKEN }}" \
-              "https://api.netlify.com/api/v1/sites/${{ env.NETLIFY_SITE_ID }}")
-            SITE_SLUG=$(echo "$SITE_JSON" | jq -r '.name // empty')
-            if [ -z "$SITE_SLUG" ]; then
-              echo "::error::Set repository variable NETLIFY_SITE_SLUG (subdomain only, e.g. mrbudgets) or fix NETLIFY_SITE_ID / token."
-              exit 1
-            fi
-          fi
-          PREVIEW_URL="https://pr-${{ github.event.number }}--${SITE_SLUG}.netlify.app"
-
-          : > .env
+          # Pull down the environment variables for the deploy-preview context
           netlify env:list --context deploy-preview --plain >> .env
-          echo "DIRECT_URL=${{ steps.create-branch.outputs.db_url }}" >> .env
-          echo "DATABASE_URL=${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
-          echo "NEXTAUTH_URL=${PREVIEW_URL}" >> .env
-          echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET_CI}" >> .env
-          echo "AUTH_TRUST_HOST=true" >> .env
 
+          # Add the database connection URLs to the .env file
+          echo DIRECT_URL="${{ steps.create-branch.outputs.db_url }}" >> .env
+          echo DATABASE_URL="${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
+
+          # Deploy the preview to Netlify
           netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
-          DEPLOY_URL=$(jq -r '.deploy_url' netlify-deploy.json)
+
+          # Get the deploy URL from the netlify-deploy.json file
+          DEPLOY_URL=$(cat netlify-deploy.json | jq -r '.deploy_url')
+
+          # Export the deploy URL as an output for this step
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
 
-      - name: Comment on pull request
+      - name: Comment on Pull Request
         uses: thollander/actions-comment-pull-request@v2
         with:
-          comment_tag: neon-netlify-preview
-          mode: recreate
           message: |
             | Resource | Link |
             |----------|------|
-            | Netlify preview | ${{ steps.deploy.outputs.deploy_url }} |
-            | Neon branch | https://console.neon.tech/app/projects/${{ env.NEON_PROJECT_ID }}/branches/${{ steps.create-branch.outputs.branch_id }} |
+            | Netlify Preview 🚀 | ${{ steps.deploy.outputs.deploy_url }} |
+            | Neon branch 🐘 | https://console.neon.tech/app/projects/${{ env.NEON_PROJECT_ID }}/branches/${{ steps.create-branch.outputs.branch_id }} |
