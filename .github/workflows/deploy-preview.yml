@@ -52,6 +52,27 @@ jobs:
       - name: Deploy Preview to Netlify with CLI
         id: deploy
         run: |
+          set -euo pipefail
+          PR_NUM="${{ github.event.number }}"
+
+          # NextAuth needs a real origin at build time (next-auth/react reads NEXTAUTH_URL when the bundle loads).
+          # `netlify deploy` runs the build before we get JSON `deploy_url`, but the preview hostname is fixed:
+          #   netlify deploy --alias pr-N  →  https://pr-N--<site-subdomain>.netlify.app
+          SITE_JSON="$(netlify api getSite --data "{\"site_id\":\"${NETLIFY_SITE_ID}\"}")"
+          SLUG="${{ vars.NETLIFY_SITE_SLUG }}"
+          if [ -z "${SLUG}" ]; then
+            SLUG="$(echo "$SITE_JSON" | jq -r '(.ssl_url // .url // "") | if type == "string" and test("netlify\\.app") then sub("^https?://"; "") | split(".netlify.app")[0] else empty end')"
+          fi
+          if [ -z "${SLUG}" ]; then
+            SLUG="$(echo "$SITE_JSON" | jq -r '.name // empty')"
+          fi
+          if [ -z "${SLUG}" ]; then
+            echo "Could not resolve Netlify site subdomain. Set the repository variable NETLIFY_SITE_SLUG (e.g. mrbudgets from mrbudgets.netlify.app)."
+            exit 1
+          fi
+          PREVIEW_URL="https://pr-${PR_NUM}--${SLUG}.netlify.app"
+          export PREVIEW_URL
+
           # Pull down the environment variables for the deploy-preview context
           netlify env:list --context deploy-preview --plain >> .env
 
@@ -59,14 +80,25 @@ jobs:
           echo DIRECT_URL="${{ steps.create-branch.outputs.db_url }}" >> .env
           echo DATABASE_URL="${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
 
+          # Remove any NEXTAUTH_URL* lines from Netlify's export (empty values break next-auth; wrong values break login).
+          node -e "
+            const fs = require('fs');
+            const path = '.env';
+            const lines = fs.readFileSync(path, 'utf8').split(/\r?\n/).filter((l) => !/^NEXTAUTH_URL(_INTERNAL)?=/.test(l));
+            fs.writeFileSync(path, lines.join('\n').replace(/\n+$/, '') + '\n');
+            fs.appendFileSync(path, 'NEXTAUTH_URL=' + process.env.PREVIEW_URL + '\n');
+          "
+
           # Deploy the preview to Netlify
-          netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
+          netlify deploy --alias="pr-${PR_NUM}" --context=deploy-preview --json > netlify-deploy.json
 
           # Get the deploy URL from the netlify-deploy.json file
-          DEPLOY_URL=$(cat netlify-deploy.json | jq -r '.deploy_url')
-
-          # Export the deploy URL as an output for this step
+          DEPLOY_URL="$(jq -r '.deploy_url' netlify-deploy.json)"
           echo "deploy_url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+
+          if [ "$DEPLOY_URL" != "$PREVIEW_URL" ]; then
+            echo "::warning::deploy_url ($DEPLOY_URL) differs from NEXTAUTH_URL used for build ($PREVIEW_URL). If login fails, align alias / subdomain logic with Netlify's actual preview hostname."
+          fi
 
       - name: Comment on Pull Request
         uses: thollander/actions-comment-pull-request@v2
