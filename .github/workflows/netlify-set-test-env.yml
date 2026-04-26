@@ -23,9 +23,21 @@ jobs:
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          set -euo pipefail
+
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "::error::No pull request number found in this event. Use a pull_request-triggered run for preview-specific deploys."
+            exit 1
+          fi
+
           BASE_DOMAIN="${NEXTAUTH_URL#https://}"
           BASE_DOMAIN="${BASE_DOMAIN#http://}"
           PREVIEW_URL="https://pr-${PR_NUMBER}--${BASE_DOMAIN}"
+          DEPLOY_ALIAS="pr-${PR_NUMBER}"
 
-          netlify env:set NEXTAUTH_URL "${PREVIEW_URL}" --context deploy-preview
-          netlify env:set TEST_ENVIRONMENT "false" --context deploy-preview
+          # Build a one-off env file for this deploy only.
+          netlify env:list --context deploy-preview --plain > .env
+          echo "NEXTAUTH_URL=${PREVIEW_URL}" >> .env
+          echo "TEST_ENVIRONMENT=false" >> .env
+
+          netlify deploy --build --context deploy-preview --alias "${DEPLOY_ALIAS}"
