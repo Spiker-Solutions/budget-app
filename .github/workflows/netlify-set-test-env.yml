@@ -20,4 +20,12 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: netlify env:set TEST_ENVIRONMENT "true"
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          BASE_DOMAIN="${NEXTAUTH_URL#https://}"
+          BASE_DOMAIN="${BASE_DOMAIN#http://}"
+          PREVIEW_URL="https://pr-${PR_NUMBER}--${BASE_DOMAIN}"
+
+          netlify env:set NEXTAUTH_URL "${PREVIEW_URL}" --context deploy-preview
+          netlify env:set TEST_ENVIRONMENT "false" --context deploy-preview
