@@ -64,6 +64,8 @@ jobs:
           echo "NEXTAUTH_URL=https://pr-${{ github.event.number }}--${BASE_HOST}" >> .env
           echo "AUTH_TRUST_HOST=true" >> .env
           echo "NEXTAUTH_SECRET=${NEXTAUTH_SECRET}" >> .env
+          # Optional: uncomment for one deploy to get verbose NextAuth logs + GET /api/debug/auth-env on that preview
+          echo "NEXTAUTH_DEBUG=true" >> .env
 
           # Deploy the preview to Netlify
           netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json

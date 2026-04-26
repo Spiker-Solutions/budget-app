@@ -62,6 +62,10 @@ providers.push(
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
   secret: process.env.NEXTAUTH_SECRET,
+  /** Netlify (and similar) terminate TLS in front of the app; required for correct host detection. */
+  trustHost: true,
+  /** Set `NEXTAUTH_DEBUG=true` in the environment to log verbose NextAuth diagnostics to server logs. */
+  debug: process.env.NEXTAUTH_DEBUG === "true",
   providers,
   session: {
     strategy: "jwt",
