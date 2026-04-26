@@ -62,7 +62,7 @@ jobs:
           echo DIRECT_URL="${{ steps.create-branch.outputs.db_url }}" >> .env
           echo DATABASE_URL="${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
           echo NEXTAUTH_URL="pr-${{ github.event.number }}--${{ env.NEXTAUTH_URL }}" >> .env
-          echo NEXTAUTH_SECRET="${{ env.NEXTAUTH_SECRET }}"
+          echo NEXTAUTH_SECRET="${{ env.NEXTAUTH_SECRET }}" >> .env
 
           # Deploy the preview to Netlify
           netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
