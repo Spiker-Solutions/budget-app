@@ -2,8 +2,7 @@ name: Netlify Set Test Env
 
 on:
   workflow_dispatch:
-    pull_request:
-      types: [opened, synchronize, reopened]
+  push:
 
 jobs:
   set-test-env:
