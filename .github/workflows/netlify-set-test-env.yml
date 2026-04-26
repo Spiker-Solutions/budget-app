@@ -22,11 +22,36 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
           set -euo pipefail
 
           if [ -z "${PR_NUMBER:-}" ]; then
-            echo "::error::No pull request number found in this event. Use a pull_request-triggered run for preview-specific deploys."
+            echo "PR number not in event payload; resolving from GitHub API."
+
+            OWNER="${GITHUB_REPOSITORY%%/*}"
+            REPO="${GITHUB_REPOSITORY##*/}"
+
+            PR_NUMBER="$(curl -sSf \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${OWNER}/${REPO}/commits/${GITHUB_SHA}/pulls" \
+              | python -c "import sys,json; d=json.load(sys.stdin); print(d[0]['number'] if isinstance(d,list) and d else '')")"
+
+            if [ -z "${PR_NUMBER:-}" ]; then
+              PR_NUMBER="$(curl -sSf \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/repos/${OWNER}/${REPO}/pulls?state=open&head=${OWNER}:${GITHUB_REF_NAME}" \
+                | python -c "import sys,json; d=json.load(sys.stdin); print(d[0]['number'] if isinstance(d,list) and d else '')")"
+            fi
+          fi
+
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "::error::Could not determine PR number from event, commit, or branch."
             exit 1
           fi
 
