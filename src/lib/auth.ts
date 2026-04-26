@@ -62,8 +62,10 @@ providers.push(
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as Adapter,
   secret: process.env.NEXTAUTH_SECRET,
-  /** Netlify (and similar) terminate TLS in front of the app; required for correct host detection. */
-  trustHost: true,
+  /**
+   * Netlify sits behind a proxy; NextAuth v4 reads `AUTH_TRUST_HOST=true` from the environment
+   * (set in deploy-preview workflow / Netlify UI) — it is not a typed `AuthOptions` field in 4.24.x.
+   */
   /** Set `NEXTAUTH_DEBUG=true` in the environment to log verbose NextAuth diagnostics to server logs. */
   debug: process.env.NEXTAUTH_DEBUG === "true",
   providers,
