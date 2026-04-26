@@ -9,6 +9,8 @@ env:
   NEON_DATABASE_USERNAME: ${{ secrets.NEON_DATABASE_USERNAME }}
   NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
   NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+  NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+  NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
 
 jobs:
   deploy-preview:
@@ -29,6 +31,7 @@ jobs:
           project_id: ${{ env.NEON_PROJECT_ID }}
           database: ${{ env.NEON_DATABASE_NAME }}
           username: ${{ env.NEON_DATABASE_USERNAME }}
+          parent: development
           branch_name: preview/pr-${{ github.event.number }}-${{ steps.branch-name.outputs.current_branch }}
 
       - name: Setup Node.js
@@ -58,6 +61,8 @@ jobs:
           # Add the database connection URLs to the .env file
           echo DIRECT_URL="${{ steps.create-branch.outputs.db_url }}" >> .env
           echo DATABASE_URL="${{ steps.create-branch.outputs.db_url_with_pooler }}" >> .env
+          echo NEXTAUTH_URL="pr-${{ github.event.number }}--${{ env.NEXTAUTH_URL }}" >> .env
+          echo NEXTAUTH_SECRET="${{ env.NEXTAUTH_SECRET }}"
 
           # Deploy the preview to Netlify
           netlify deploy --alias="pr-${{ github.event.number }}" --context=deploy-preview --json > netlify-deploy.json
