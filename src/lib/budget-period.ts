@@ -204,6 +204,95 @@ export function sumExpensesInRange(
   }, 0);
 }
 
+export function isExpenseInRange(expense: ExpenseInPeriodInput, range: PeriodBounds): boolean {
+  const t = expense.date.getTime();
+  return t >= range.start.getTime() && t <= range.end.getTime();
+}
+
+export function filterExpensesInRange<T extends ExpenseInPeriodInput>(
+  expenses: T[],
+  range: PeriodBounds,
+  envelopeId?: string
+): T[] {
+  return expenses.filter((e) => {
+    if (envelopeId !== undefined && e.envelopeId !== envelopeId) return false;
+    return isExpenseInRange(e, range);
+  });
+}
+
+export function isViewingCurrentPeriod(
+  referenceDate: Date,
+  budget: BudgetPeriodInput,
+  now: Date = new Date()
+): boolean {
+  const viewing = getPeriodContaining(referenceDate, budget);
+  const current = getPeriodContaining(now, budget);
+  return viewing.start.getTime() === current.start.getTime();
+}
+
+/** Earliest period that may be viewed (first period containing the budget anchor). */
+export function getEarliestViewablePeriodReference(budget: BudgetPeriodInput): Date {
+  return budgetAnchor(budget);
+}
+
+export function canNavigateToPreviousPeriod(
+  referenceDate: Date,
+  budget: BudgetPeriodInput
+): boolean {
+  const current = getPeriodContaining(referenceDate, budget);
+  const prev = getPreviousPeriod(current, budget);
+  if (!prev) return false;
+  const budgetStart = budgetAnchor(budget);
+  return prev.end.getTime() >= budgetStart.getTime();
+}
+
+export function canNavigateToNextPeriod(
+  referenceDate: Date,
+  budget: BudgetPeriodInput,
+  now: Date = new Date()
+): boolean {
+  return !isViewingCurrentPeriod(referenceDate, budget, now);
+}
+
+/** True when the budget spans more than one viewable period (earliest is not the only one). */
+export function hasMultipleViewablePeriods(
+  budget: BudgetPeriodInput,
+  now: Date = new Date()
+): boolean {
+  return canNavigateToPreviousPeriod(now, budget);
+}
+
+export function getViewableDateRange(
+  budget: BudgetPeriodInput,
+  now: Date = new Date()
+): { min: Date; max: Date } {
+  return {
+    min: getEarliestViewablePeriodReference(budget),
+    max: startOfLocalDay(now),
+  };
+}
+
+export function getPreviousPeriodReferenceDate(
+  referenceDate: Date,
+  budget: BudgetPeriodInput
+): Date | null {
+  if (!canNavigateToPreviousPeriod(referenceDate, budget)) return null;
+  const current = getPeriodContaining(referenceDate, budget);
+  const prev = getPreviousPeriod(current, budget);
+  if (!prev) return null;
+  return addLocalDays(prev.start, 1);
+}
+
+export function getNextPeriodReferenceDate(
+  referenceDate: Date,
+  budget: BudgetPeriodInput,
+  now: Date = new Date()
+): Date | null {
+  if (!canNavigateToNextPeriod(referenceDate, budget, now)) return null;
+  const current = getPeriodContaining(referenceDate, budget);
+  return addLocalDays(current.end, 1);
+}
+
 function effectiveCarryForEnvelope(
   budget: BudgetPeriodInput,
   envelope: EnvelopeCarryInput

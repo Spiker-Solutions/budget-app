@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Title,
   Text,
@@ -18,22 +18,54 @@ import { IconPlus, IconDots, IconEdit, IconTrash } from "@tabler/icons-react";
 import Link from "next/link";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
-import { useBudgetStore } from "@/stores/budgetStore";
 import { formatCurrency } from "@/lib/client-utils";
+import { filterExpensesInRange } from "@/lib/budget-period";
+import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
+import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
 import dayjs from "dayjs";
 
 export default function ExpensesPage() {
   const { expenses, fetchExpenses, deleteExpense, isLoading } = useExpenseStore();
   const { currentBudgetId } = useUiStore();
-  const { budgets } = useBudgetStore();
 
-  const currentBudget = budgets.find((b) => b.id === currentBudgetId);
+  const {
+    currentBudget,
+    periodTotals,
+    referenceDate,
+    isCurrentPeriod,
+    canGoPrevious,
+    canGoNext,
+    hasMultiplePeriods,
+    viewableDateRange,
+    goToPreviousPeriod,
+    goToNextPeriod,
+    goToCurrentPeriod,
+    goToPeriodContainingDate,
+  } = useBudgetPeriodView([], expenses);
 
   useEffect(() => {
     if (currentBudgetId) {
       fetchExpenses(undefined, currentBudgetId);
     }
   }, [currentBudgetId, fetchExpenses]);
+
+  const periodExpenses = useMemo(() => {
+    if (!periodTotals) return expenses;
+    return filterExpensesInRange(
+      expenses.map((e) => ({
+        ...e,
+        envelopeId: e.envelopeId,
+        date: new Date(e.date),
+        amount: Number(e.amount),
+      })),
+      periodTotals.currentPeriod
+    );
+  }, [expenses, periodTotals]);
+
+  const periodTotalSpent = useMemo(
+    () => periodExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
+    [periodExpenses]
+  );
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this expense?")) {
@@ -55,12 +87,32 @@ export default function ExpensesPage() {
 
   return (
     <Stack>
-      <Group justify="space-between">
+      <Group justify="space-between" align="flex-start">
         <div>
           <Title order={2}>Expenses</Title>
           <Text c="dimmed">
-            Track all your expenses for {currentBudget.name}
+            {isCurrentPeriod
+              ? `Track all your expenses for ${currentBudget.name}`
+              : `Expenses for ${currentBudget.name} in the selected period`}
           </Text>
+          {periodTotals && viewableDateRange && (
+            <Group mt="sm">
+              <PeriodNavigator
+                period={periodTotals.currentPeriod}
+                referenceDate={referenceDate}
+                isCurrentPeriod={isCurrentPeriod}
+                canGoPrevious={canGoPrevious}
+                canGoNext={canGoNext}
+                hasMultiplePeriods={hasMultiplePeriods}
+                minDate={viewableDateRange.min}
+                maxDate={viewableDateRange.max}
+                onPrevious={goToPreviousPeriod}
+                onNext={goToNextPeriod}
+                onCurrent={goToCurrentPeriod}
+                onSelectDate={goToPeriodContainingDate}
+              />
+            </Group>
+          )}
         </div>
         <Button
           component={Link}
@@ -79,18 +131,24 @@ export default function ExpensesPage() {
             <Skeleton height={40} />
           </Stack>
         </Card>
-      ) : expenses.length === 0 ? (
+      ) : periodExpenses.length === 0 ? (
         <Card withBorder p="xl">
           <Stack align="center">
-            <Text c="dimmed">No expenses yet</Text>
-            <Button
-              component={Link}
-              href="/dashboard/expenses/new"
-              leftSection={<IconPlus size={18} />}
-              variant="light"
-            >
-              Add your first expense
-            </Button>
+            <Text c="dimmed">
+              {isCurrentPeriod
+                ? "No expenses yet"
+                : "No expenses in this period"}
+            </Text>
+            {isCurrentPeriod && (
+              <Button
+                component={Link}
+                href="/dashboard/expenses/new"
+                leftSection={<IconPlus size={18} />}
+                variant="light"
+              >
+                Add your first expense
+              </Button>
+            )}
           </Stack>
         </Card>
       ) : (
@@ -107,7 +165,7 @@ export default function ExpensesPage() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {expenses.map((expense) => (
+              {periodExpenses.map((expense) => (
                 <Table.Tr key={expense.id}>
                   <Table.Td>
                     {dayjs(expense.date).format("MMM D, YYYY")}
@@ -176,14 +234,12 @@ export default function ExpensesPage() {
 
       <Group justify="space-between">
         <Text size="sm" c="dimmed">
-          Total: {expenses.length} expense{expenses.length !== 1 ? "s" : ""}
+          {periodExpenses.length} expense{periodExpenses.length !== 1 ? "s" : ""}
+          {!isCurrentPeriod && " in this period"}
         </Text>
         <Text size="sm" fw={500}>
           Total spent:{" "}
-          {formatCurrency(
-            expenses.reduce((sum, e) => sum + Number(e.amount), 0),
-            currentBudget.currency
-          )}
+          {formatCurrency(periodTotalSpent, currentBudget.currency)}
         </Text>
       </Group>
     </Stack>
