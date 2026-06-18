@@ -21,11 +21,9 @@ import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
 import { formatCurrency } from "@/lib/client-utils";
-import {
-  computeCarryAndPeriodTotals,
-  type EnvelopePeriodTotals,
-} from "@/lib/budget-period";
-import dayjs from "dayjs";
+import { type EnvelopePeriodTotals } from "@/lib/budget-period";
+import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
+import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
 
 export default function DashboardPage() {
   const { budgets, isLoading: budgetsLoading } = useBudgetStore();
@@ -33,10 +31,20 @@ export default function DashboardPage() {
   const { expenses, fetchExpenses } = useExpenseStore();
   const { currentBudgetId } = useUiStore();
 
-  const currentBudget = useMemo(
-    () => budgets.find((b) => b.id === currentBudgetId),
-    [budgets, currentBudgetId]
-  );
+  const {
+    currentBudget,
+    periodTotals,
+    referenceDate,
+    isCurrentPeriod,
+    canGoPrevious,
+    canGoNext,
+    hasMultiplePeriods,
+    viewableDateRange,
+    goToPreviousPeriod,
+    goToNextPeriod,
+    goToCurrentPeriod,
+    goToPeriodContainingDate,
+  } = useBudgetPeriodView(envelopes, expenses);
 
   useEffect(() => {
     if (currentBudgetId) {
@@ -49,29 +57,6 @@ export default function DashboardPage() {
     () => envelopes.reduce((sum, e) => sum + Number(e.allocation), 0),
     [envelopes]
   );
-
-  const periodTotals = useMemo(() => {
-    if (!currentBudget) return null;
-    const budgetInput = {
-      periodType: currentBudget.periodType,
-      periodDay: currentBudget.periodDay ?? null,
-      customDays: currentBudget.customDays ?? null,
-      startDate: currentBudget.startDate ? new Date(currentBudget.startDate) : null,
-      createdAt: new Date(currentBudget.createdAt),
-      carryOverRemainder: currentBudget.carryOverRemainder,
-    };
-    const envelopeInputs = envelopes.map((e) => ({
-      id: e.id,
-      allocation: Number(e.allocation),
-      carryOverRemainder: e.carryOverRemainder,
-    }));
-    const expenseInputs = expenses.map((e) => ({
-      envelopeId: e.envelopeId,
-      date: new Date(e.date),
-      amount: Number(e.amount),
-    }));
-    return computeCarryAndPeriodTotals(budgetInput, envelopeInputs, expenseInputs);
-  }, [currentBudget, envelopes, expenses]);
 
   const envelopeTotalsById = useMemo(() => {
     const m = new Map<string, EnvelopePeriodTotals>();
@@ -131,15 +116,27 @@ export default function DashboardPage() {
 
   return (
     <Stack>
-      <Group justify="space-between">
+      <Group justify="space-between" align="flex-start">
         <div>
           <Title order={2}>{currentBudget.name}</Title>
           <Text c="dimmed">{currentBudget.description || "Your budget"}</Text>
-          {periodTotals && (
-            <Text size="sm" c="dimmed" mt={4}>
-              Current period: {dayjs(periodTotals.currentPeriod.start).format("MMM D, YYYY")} –{" "}
-              {dayjs(periodTotals.currentPeriod.end).format("MMM D, YYYY")}
-            </Text>
+          {periodTotals && viewableDateRange && (
+            <Group mt="sm">
+              <PeriodNavigator
+                period={periodTotals.currentPeriod}
+                referenceDate={referenceDate}
+                isCurrentPeriod={isCurrentPeriod}
+                canGoPrevious={canGoPrevious}
+                canGoNext={canGoNext}
+                hasMultiplePeriods={hasMultiplePeriods}
+                minDate={viewableDateRange.min}
+                maxDate={viewableDateRange.max}
+                onPrevious={goToPreviousPeriod}
+                onNext={goToNextPeriod}
+                onCurrent={goToCurrentPeriod}
+                onSelectDate={goToPeriodContainingDate}
+              />
+            </Group>
           )}
         </div>
         <Group>
@@ -164,7 +161,7 @@ export default function DashboardPage() {
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
         <Card withBorder>
           <Text size="sm" c="dimmed" fw={500}>
-            Envelope total (this period)
+            Envelope total{isCurrentPeriod ? " (this period)" : ""}
           </Text>
           <Text size="xl" fw={700}>
             {formatCurrency(totalAvailableThisPeriod, currentBudget.currency)}
@@ -185,7 +182,7 @@ export default function DashboardPage() {
 
         <Card withBorder>
           <Text size="sm" c="dimmed" fw={500}>
-            Spent (this period)
+            Spent{isCurrentPeriod ? " (this period)" : ""}
           </Text>
           <Text
             size="xl"
@@ -204,7 +201,7 @@ export default function DashboardPage() {
 
         <Card withBorder>
           <Text size="sm" c="dimmed" fw={500}>
-            Remaining (this period)
+            Remaining{isCurrentPeriod ? " (this period)" : ""}
           </Text>
           <Text size="xl" fw={700} c={totalRemainingThisPeriod < 0 ? "red" : "green"}>
             {formatCurrency(totalRemainingThisPeriod, currentBudget.currency)}

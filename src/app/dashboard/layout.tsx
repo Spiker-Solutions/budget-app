@@ -43,7 +43,7 @@ export default function DashboardLayout({
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
 
   const { budgets, fetchBudgets, isLoading: budgetsLoading } = useBudgetStore();
-  const { currentBudgetId, setCurrentBudgetId } = useUiStore();
+  const { currentBudgetId, setCurrentBudgetId, resetPeriodReference } = useUiStore();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -62,6 +62,10 @@ export default function DashboardLayout({
       setCurrentBudgetId(budgets[0].id);
     }
   }, [budgets, currentBudgetId, setCurrentBudgetId]);
+
+  useEffect(() => {
+    resetPeriodReference();
+  }, [currentBudgetId, resetPeriodReference]);
 
   if (status === "loading") {
     return (
