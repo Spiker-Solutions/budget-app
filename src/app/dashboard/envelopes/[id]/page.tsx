@@ -37,7 +37,7 @@ import { useExpenseStore } from "@/stores/expenseStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
-import { computeCarryAndPeriodTotals } from "@/lib/budget-period";
+import { computeCarryAndPeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
 import dayjs from "dayjs";
 
 export default function EnvelopeDetailPage({
@@ -204,6 +204,7 @@ export default function EnvelopeDetailPage({
       {
         id: envelope.id,
         allocation: Number(envelope.allocation),
+        allocationType: envelope.allocationType ?? "AMOUNT",
         carryOverRemainder: envelope.carryOverRemainder ?? null,
       },
     ];
@@ -212,7 +213,13 @@ export default function EnvelopeDetailPage({
       date: new Date(e.date),
       amount: Number(e.amount),
     }));
-    return computeCarryAndPeriodTotals(budgetInput, envelopeInputs, expenseInputs);
+    return computeCarryAndPeriodTotals(
+      budgetInput,
+      envelopeInputs,
+      expenseInputs,
+      undefined,
+      Number(budget.amount)
+    );
   }, [budget, envelope, expenses]);
 
   if (loading) {
@@ -237,7 +244,13 @@ export default function EnvelopeDetailPage({
   }
 
   const envPeriod = periodTotals?.envelopeTotals[0];
-  const allocation = Number(envelope.allocation);
+  const allocation =
+    envPeriod?.baseAllocation ??
+    resolveEnvelopeAllocation(
+      Number(envelope.allocation),
+      envelope.allocationType ?? "AMOUNT",
+      Number(budget?.amount ?? 0)
+    );
   const carriedFromPrior = envPeriod?.carriedFromPrior ?? 0;
   const availableThisPeriod = envPeriod?.availableThisPeriod ?? allocation;
   const totalSpentThisPeriod = envPeriod?.spentThisPeriod ?? 0;

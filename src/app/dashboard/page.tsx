@@ -23,7 +23,7 @@ import { useUiStore } from "@/stores/uiStore";
 import { useSession } from "next-auth/react";
 import { canManageBudget, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
-import { type EnvelopePeriodTotals } from "@/lib/budget-period";
+import { type EnvelopePeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
 
@@ -56,10 +56,7 @@ export default function DashboardPage() {
     }
   }, [currentBudgetId, fetchEnvelopes, fetchExpenses]);
 
-  const totalAllocated = useMemo(
-    () => envelopes.reduce((sum, e) => sum + Number(e.allocation), 0),
-    [envelopes]
-  );
+  const totalAllocated = periodTotals?.totalBaseAllocation ?? 0;
 
   const envelopeTotalsById = useMemo(() => {
     const m = new Map<string, EnvelopePeriodTotals>();
@@ -261,7 +258,13 @@ export default function DashboardPage() {
           {envelopes.map((envelope) => {
             const envT = envelopeTotalsById.get(envelope.id);
             const envelopeSpent = envT?.spentThisPeriod ?? 0;
-            const envelopeAvailable = envT?.availableThisPeriod ?? Number(envelope.allocation);
+            const envelopeAvailable =
+              envT?.availableThisPeriod ??
+              resolveEnvelopeAllocation(
+                Number(envelope.allocation),
+                envelope.allocationType ?? "AMOUNT",
+                budgetAmount
+              );
             const envelopeRemaining = envT?.remainingThisPeriod ?? envelopeAvailable - envelopeSpent;
             const envelopePercentage =
               envelopeAvailable > 0 ? (envelopeSpent / envelopeAvailable) * 100 : 0;

@@ -19,6 +19,7 @@ export type BudgetPeriodInput = {
 export type EnvelopeCarryInput = {
   id: string;
   allocation: number;
+  allocationType?: "AMOUNT" | "PERCENTAGE";
   carryOverRemainder: boolean | null;
 };
 
@@ -300,6 +301,17 @@ function effectiveCarryForEnvelope(
   return envelope.carryOverRemainder ?? budget.carryOverRemainder;
 }
 
+export function resolveEnvelopeAllocation(
+  allocation: number,
+  allocationType: "AMOUNT" | "PERCENTAGE",
+  budgetAmount: number
+): number {
+  if (allocationType === "PERCENTAGE") {
+    return Math.round((allocation / 100) * budgetAmount * 100) / 100;
+  }
+  return allocation;
+}
+
 /**
  * No carry from time before the budget existed (anchor = startDate ?? createdAt start of local day).
  */
@@ -316,14 +328,19 @@ export function computeCarryAndPeriodTotals(
   budget: BudgetPeriodInput,
   envelopes: EnvelopeCarryInput[],
   expenses: ExpenseInPeriodInput[],
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  budgetAmount = 0
 ): BudgetPeriodTotals {
   const currentPeriod = getPeriodContaining(referenceDate, budget);
   const previousPeriod = getPreviousPeriod(currentPeriod, budget);
   const applyCarry = shouldApplyCarryFromPrevious(budget, previousPeriod);
 
   const envelopeTotals: EnvelopePeriodTotals[] = envelopes.map((env) => {
-    const baseAllocation = env.allocation;
+    const baseAllocation = resolveEnvelopeAllocation(
+      env.allocation,
+      env.allocationType ?? "AMOUNT",
+      budgetAmount
+    );
     const carryEnabled = effectiveCarryForEnvelope(budget, env);
     let carriedFromPrior = 0;
     if (applyCarry && carryEnabled && previousPeriod) {

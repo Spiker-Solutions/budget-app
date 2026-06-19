@@ -13,7 +13,7 @@ import {
   type BudgetPeriodInput,
   type BudgetPeriodTotals,
 } from "@/lib/budget-period";
-import type { Budget } from "@/types";
+import type { Budget, BudgetWithRelations } from "@/types";
 
 export function toBudgetPeriodInput(budget: Budget): BudgetPeriodInput {
   return {
@@ -29,6 +29,7 @@ export function toBudgetPeriodInput(budget: Budget): BudgetPeriodInput {
 type EnvelopeLike = {
   id: string;
   allocation: unknown;
+  allocationType?: "AMOUNT" | "PERCENTAGE";
   carryOverRemainder: boolean | null;
 };
 
@@ -42,7 +43,7 @@ export function useBudgetPeriodView(
   envelopes: EnvelopeLike[],
   expenses: ExpenseLike[]
 ): {
-  currentBudget: Budget | undefined;
+  currentBudget: BudgetWithRelations | undefined;
   referenceDate: Date;
   periodTotals: BudgetPeriodTotals | null;
   isCurrentPeriod: boolean;
@@ -78,6 +79,7 @@ export function useBudgetPeriodView(
     const envelopeInputs = envelopes.map((e) => ({
       id: e.id,
       allocation: Number(e.allocation),
+      allocationType: e.allocationType ?? "AMOUNT",
       carryOverRemainder: e.carryOverRemainder,
     }));
     const expenseInputs = expenses.map((e) => ({
@@ -89,9 +91,10 @@ export function useBudgetPeriodView(
       budgetInput,
       envelopeInputs,
       expenseInputs,
-      referenceDate
+      referenceDate,
+      Number(currentBudget?.amount ?? 0)
     );
-  }, [budgetInput, envelopes, expenses, referenceDate]);
+  }, [budgetInput, envelopes, expenses, referenceDate, currentBudget?.amount]);
 
   const isCurrentPeriod = useMemo(
     () => (budgetInput ? isViewingCurrentPeriod(referenceDate, budgetInput) : true),
