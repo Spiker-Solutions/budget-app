@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
@@ -31,8 +31,9 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useBudgetSelection } from "@/hooks/useBudgetSelection";
 
-export default function DashboardLayout({
+function DashboardLayoutContent({
   children,
 }: {
   children: React.ReactNode;
@@ -43,7 +44,8 @@ export default function DashboardLayout({
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
 
   const { budgets, fetchBudgets, isLoading: budgetsLoading } = useBudgetStore();
-  const { currentBudgetId, setCurrentBudgetId, resetPeriodReference } = useUiStore();
+  const { currentBudgetId, selectBudget, hydrated } = useBudgetSelection(budgets);
+  const { resetPeriodReference } = useUiStore();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -58,16 +60,10 @@ export default function DashboardLayout({
   }, [status, fetchBudgets]);
 
   useEffect(() => {
-    if (budgets.length > 0 && !currentBudgetId) {
-      setCurrentBudgetId(budgets[0].id);
-    }
-  }, [budgets, currentBudgetId, setCurrentBudgetId]);
-
-  useEffect(() => {
     resetPeriodReference();
   }, [currentBudgetId, resetPeriodReference]);
 
-  if (status === "loading") {
+  if (status === "loading" || !hydrated) {
     return (
       <AppShell padding="md">
         <Stack p="md">
@@ -134,7 +130,7 @@ export default function DashboardLayout({
                   placeholder="Select a budget"
                   data={budgetOptions}
                   value={currentBudgetId}
-                  onChange={(value) => setCurrentBudgetId(value)}
+                  onChange={selectBudget}
                   allowDeselect={false}
                   style={{ flex: 1 }}
                 />
@@ -191,5 +187,29 @@ export default function DashboardLayout({
 
       <AppShell.Main>{children}</AppShell.Main>
     </AppShell>
+  );
+}
+
+function DashboardLayoutFallback() {
+  return (
+    <AppShell padding="md">
+      <Stack p="md">
+        <Skeleton height={40} />
+        <Skeleton height={200} />
+        <Skeleton height={200} />
+      </Stack>
+    </AppShell>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={<DashboardLayoutFallback />}>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
+    </Suspense>
   );
 }
