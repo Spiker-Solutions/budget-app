@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Title,
   Text,
@@ -16,8 +16,11 @@ import {
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
+import { useBudgetStore } from "@/stores/budgetStore";
 import { useUiStore } from "@/stores/uiStore";
+import { canManageBudget, getMembershipRole } from "@/lib/permissions";
 import type { CreateEnvelopeInput } from "@/types";
 
 type EnvelopeFormValues = Omit<CreateEnvelopeInput, "budgetId" | "carryOverRemainder"> & {
@@ -26,9 +29,28 @@ type EnvelopeFormValues = Omit<CreateEnvelopeInput, "budgetId" | "carryOverRemai
 
 export default function NewEnvelopePage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const { createEnvelope, fetchEnvelopes } = useEnvelopeStore();
+  const { budgets } = useBudgetStore();
   const { currentBudgetId } = useUiStore();
+
+  const currentBudget = budgets.find((b) => b.id === currentBudgetId);
+  const userRole = getMembershipRole(currentBudget?.members, session?.user?.id);
+  const canManage = canManageBudget(userRole);
+
+  useEffect(() => {
+    if (!currentBudgetId || !session?.user?.id || !currentBudget) return;
+
+    if (!canManage) {
+      notifications.show({
+        title: "Access denied",
+        message: "Only budget owners and admins can create envelopes",
+        color: "red",
+      });
+      router.replace("/dashboard");
+    }
+  }, [currentBudgetId, session?.user?.id, currentBudget, canManage, router]);
 
   const form = useForm<EnvelopeFormValues>({
     initialValues: {
@@ -99,6 +121,10 @@ export default function NewEnvelopePage() {
         <Text c="red">Please select a budget first</Text>
       </Stack>
     );
+  }
+
+  if (!canManage) {
+    return null;
   }
 
   return (

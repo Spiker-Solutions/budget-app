@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { updateBudgetSchema } from "@/lib/validations";
+import { canManageBudget } from "@/lib/permissions";
 
 async function checkBudgetAccess(budgetId: string, userId: string, requireAdmin = false) {
   const membership = await prisma.budgetUser.findUnique({
@@ -16,7 +17,7 @@ async function checkBudgetAccess(budgetId: string, userId: string, requireAdmin 
   });
 
   if (!membership) return null;
-  if (requireAdmin && membership.role !== "ADMIN") return null;
+  if (requireAdmin && !canManageBudget(membership.role)) return null;
 
   return membership;
 }

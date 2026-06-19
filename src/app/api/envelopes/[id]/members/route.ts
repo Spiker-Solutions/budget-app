@@ -4,18 +4,31 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { inviteMemberSchema } from "@/lib/validations";
+import { canManageEnvelope } from "@/lib/permissions";
 
 async function checkEnvelopeAdmin(envelopeId: string, userId: string) {
-  const membership = await prisma.envelopeUser.findUnique({
-    where: {
-      userId_envelopeId: {
-        userId,
-        envelopeId,
+  const envelope = await prisma.envelope.findUnique({
+    where: { id: envelopeId },
+    include: {
+      budget: {
+        include: {
+          members: {
+            where: { userId },
+          },
+        },
+      },
+      members: {
+        where: { userId },
       },
     },
   });
 
-  return membership?.role === "ADMIN" || membership?.role === "OWNER";
+  if (!envelope) return false;
+
+  return canManageEnvelope(
+    envelope.budget.members[0]?.role,
+    envelope.members[0]?.role
+  );
 }
 
 export async function POST(

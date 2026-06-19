@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { inviteMemberSchema } from "@/lib/validations";
+import { canManageBudget } from "@/lib/permissions";
 
 async function checkBudgetAdmin(budgetId: string, userId: string) {
   const membership = await prisma.budgetUser.findUnique({
@@ -15,7 +16,7 @@ async function checkBudgetAdmin(budgetId: string, userId: string) {
     },
   });
 
-  return membership?.role === "ADMIN" || membership?.role === "OWNER";
+  return canManageBudget(membership?.role);
 }
 
 export async function POST(

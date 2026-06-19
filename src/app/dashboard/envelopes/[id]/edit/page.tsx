@@ -17,9 +17,12 @@ import {
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { IconArrowLeft } from "@tabler/icons-react";
 import Link from "next/link";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
+import { useBudgetStore } from "@/stores/budgetStore";
+import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import type { UpdateEnvelopeInput } from "@/types";
 
 type EnvelopeEditFormValues = Omit<UpdateEnvelopeInput, "carryOverRemainder"> & {
@@ -37,10 +40,12 @@ export default function EditEnvelopePage({
   params: { id: string };
 }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [envelope, setEnvelope] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { updateEnvelope, fetchEnvelopes } = useEnvelopeStore();
+  const { budgets } = useBudgetStore();
 
   const form = useForm<EnvelopeEditFormValues>({
     initialValues: {
@@ -57,18 +62,35 @@ export default function EditEnvelopePage({
   });
 
   useEffect(() => {
+    if (!session?.user?.id) return;
+
     const fetchEnvelope = async () => {
       setLoading(true);
       try {
         const response = await fetch(`/api/envelopes/${params.id}`);
         if (response.ok) {
           const data = await response.json();
-          setEnvelope(data.data);
+          const envelopeData = data.data;
+          const budget = budgets.find((b) => b.id === envelopeData.budgetId);
+          const budgetRole = getMembershipRole(budget?.members, session?.user?.id);
+          const envelopeRole = getMembershipRole(envelopeData.members, session?.user?.id);
+
+          if (!canManageEnvelope(budgetRole, envelopeRole)) {
+            notifications.show({
+              title: "Access denied",
+              message: "Only owners and admins can edit envelope settings",
+              color: "red",
+            });
+            router.replace(`/dashboard/envelopes/${params.id}`);
+            return;
+          }
+
+          setEnvelope(envelopeData);
           form.setValues({
-            name: data.data.name,
-            allocation: Number(data.data.allocation),
-            description: data.data.description || "",
-            carryMode: carryModeFromEnvelope(data.data.carryOverRemainder),
+            name: envelopeData.name,
+            allocation: Number(envelopeData.allocation),
+            description: envelopeData.description || "",
+            carryMode: carryModeFromEnvelope(envelopeData.carryOverRemainder),
           });
         } else {
           router.push("/dashboard");
@@ -82,7 +104,7 @@ export default function EditEnvelopePage({
     };
 
     fetchEnvelope();
-  }, [params.id, router]);
+  }, [params.id, router, budgets, session?.user?.id]);
 
   const handleSubmit = async (values: EnvelopeEditFormValues) => {
     setSaving(true);

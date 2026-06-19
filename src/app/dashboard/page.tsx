@@ -20,12 +20,15 @@ import { useBudgetStore } from "@/stores/budgetStore";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
+import { useSession } from "next-auth/react";
+import { canManageBudget, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
 import { type EnvelopePeriodTotals } from "@/lib/budget-period";
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
   const { budgets, isLoading: budgetsLoading } = useBudgetStore();
   const { envelopes, fetchEnvelopes, isLoading: envelopesLoading } = useEnvelopeStore();
   const { expenses, fetchExpenses } = useExpenseStore();
@@ -69,6 +72,8 @@ export default function DashboardPage() {
   }, [periodTotals]);
 
   const budgetAmount = currentBudget ? Number(currentBudget.amount) : 0;
+  const userRole = getMembershipRole(currentBudget?.members, session?.user?.id);
+  const canManageBudgetSettings = canManageBudget(userRole);
   const totalAvailableThisPeriod = periodTotals?.totalAvailableThisPeriod ?? 0;
   const totalCarriedFromPrior = periodTotals?.totalCarriedFromPrior ?? 0;
   const totalSpentThisPeriod = periodTotals?.totalSpentThisPeriod ?? 0;
@@ -148,13 +153,15 @@ export default function DashboardPage() {
           >
             Add Expense
           </Button>
-          <Button
-            component={Link}
-            href="/dashboard/budgets/settings"
-            variant="subtle"
-          >
-            Settings
-          </Button>
+          {canManageBudgetSettings && (
+            <Button
+              component={Link}
+              href="/dashboard/budgets/settings"
+              variant="subtle"
+            >
+              Settings
+            </Button>
+          )}
         </Group>
       </Group>
 
@@ -214,15 +221,17 @@ export default function DashboardPage() {
 
       <Group justify="space-between" mt="lg">
         <Title order={3}>Envelopes</Title>
-        <Button
-          component={Link}
-          href="/dashboard/envelopes/new"
-          leftSection={<IconPlus size={18} />}
-          variant="light"
-          size="sm"
-        >
-          Add Envelope
-        </Button>
+        {canManageBudgetSettings && (
+          <Button
+            component={Link}
+            href="/dashboard/envelopes/new"
+            leftSection={<IconPlus size={18} />}
+            variant="light"
+            size="sm"
+          >
+            Add Envelope
+          </Button>
+        )}
       </Group>
 
       {envelopesLoading ? (
@@ -235,14 +244,16 @@ export default function DashboardPage() {
         <Card withBorder p="xl">
           <Stack align="center">
             <Text c="dimmed">No envelopes yet</Text>
-            <Button
-              component={Link}
-              href="/dashboard/envelopes/new"
-              leftSection={<IconPlus size={18} />}
-              variant="light"
-            >
-              Create your first envelope
-            </Button>
+            {canManageBudgetSettings && (
+              <Button
+                component={Link}
+                href="/dashboard/envelopes/new"
+                leftSection={<IconPlus size={18} />}
+                variant="light"
+              >
+                Create your first envelope
+              </Button>
+            )}
           </Stack>
         </Card>
       ) : (

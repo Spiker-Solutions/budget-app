@@ -31,9 +31,11 @@ import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useBudgetStore } from "@/stores/budgetStore";
+import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
 import { computeCarryAndPeriodTotals } from "@/lib/budget-period";
 import dayjs from "dayjs";
@@ -44,6 +46,7 @@ export default function EnvelopeDetailPage({
   params: { id: string };
 }) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [envelope, setEnvelope] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -183,6 +186,10 @@ export default function EnvelopeDetailPage({
     [envelope, budgets]
   );
 
+  const budgetRole = getMembershipRole(budget?.members, session?.user?.id);
+  const envelopeRole = getMembershipRole(envelope?.members, session?.user?.id);
+  const canManage = canManageEnvelope(budgetRole, envelopeRole);
+
   const periodTotals = useMemo(() => {
     if (!envelope || !budget) return null;
     const budgetInput = {
@@ -249,14 +256,16 @@ export default function EnvelopeDetailPage({
         >
           Back to Dashboard
         </Button>
-        <Button
-          component={Link}
-          href={`/dashboard/envelopes/${params.id}/edit`}
-          leftSection={<IconEdit size={18} />}
-          variant="light"
-        >
-          Edit Envelope
-        </Button>
+        {canManage && (
+          <Button
+            component={Link}
+            href={`/dashboard/envelopes/${params.id}/edit`}
+            leftSection={<IconEdit size={18} />}
+            variant="light"
+          >
+            Edit Envelope
+          </Button>
+        )}
       </Group>
 
       <Card withBorder>
@@ -332,76 +341,78 @@ export default function EnvelopeDetailPage({
         </Stack>
       </Card>
 
-      <Card withBorder>
-        <Stack>
-          <Group justify="space-between">
-            <div>
-              <Title order={4}>Members</Title>
-              <Text size="sm" c="dimmed">
-                Manage who has access to this envelope
-              </Text>
-            </div>
-            <Button
-              leftSection={<IconUserPlus size={18} />}
-              variant="light"
-              size="sm"
-              onClick={() => setInviteModalOpen(true)}
-            >
-              Invite Member
-            </Button>
-          </Group>
+      {canManage && (
+        <Card withBorder>
+          <Stack>
+            <Group justify="space-between">
+              <div>
+                <Title order={4}>Members</Title>
+                <Text size="sm" c="dimmed">
+                  Manage who has access to this envelope
+                </Text>
+              </div>
+              <Button
+                leftSection={<IconUserPlus size={18} />}
+                variant="light"
+                size="sm"
+                onClick={() => setInviteModalOpen(true)}
+              >
+                Invite Member
+              </Button>
+            </Group>
 
-          {envelope.members && envelope.members.length > 0 ? (
-            <Table>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Name</Table.Th>
-                  <Table.Th>Email</Table.Th>
-                  <Table.Th>Role</Table.Th>
-                  <Table.Th></Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {envelope.members.map((member: any) => (
-                  <Table.Tr key={member.id}>
-                    <Table.Td>{member.user.name || "Unknown"}</Table.Td>
-                    <Table.Td>{member.user.email}</Table.Td>
-                    <Table.Td>
-                      <Badge 
-                        variant="light" 
-                        size="sm"
-                        color={
-                          member.role === "OWNER" ? "grape" : 
-                          member.role === "ADMIN" ? "blue" : 
-                          "gray"
-                        }
-                      >
-                        {member.role}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>
-                      {member.role !== "OWNER" && (
-                        <ActionIcon 
-                          variant="subtle" 
-                          color="red"
-                          size="sm"
-                          onClick={() => handleRemoveMember(member.userId)}
-                        >
-                          <IconTrash size={14} />
-                        </ActionIcon>
-                      )}
-                    </Table.Td>
+            {envelope.members && envelope.members.length > 0 ? (
+              <Table>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Name</Table.Th>
+                    <Table.Th>Email</Table.Th>
+                    <Table.Th>Role</Table.Th>
+                    <Table.Th></Table.Th>
                   </Table.Tr>
-                ))}
-              </Table.Tbody>
-            </Table>
-          ) : (
-            <Text size="sm" c="dimmed">
-              No additional members
-            </Text>
-          )}
-        </Stack>
-      </Card>
+                </Table.Thead>
+                <Table.Tbody>
+                  {envelope.members.map((member: any) => (
+                    <Table.Tr key={member.id}>
+                      <Table.Td>{member.user.name || "Unknown"}</Table.Td>
+                      <Table.Td>{member.user.email}</Table.Td>
+                      <Table.Td>
+                        <Badge 
+                          variant="light" 
+                          size="sm"
+                          color={
+                            member.role === "OWNER" ? "grape" : 
+                            member.role === "ADMIN" ? "blue" : 
+                            "gray"
+                          }
+                        >
+                          {member.role}
+                        </Badge>
+                      </Table.Td>
+                      <Table.Td>
+                        {member.role !== "OWNER" && (
+                          <ActionIcon 
+                            variant="subtle" 
+                            color="red"
+                            size="sm"
+                            onClick={() => handleRemoveMember(member.userId)}
+                          >
+                            <IconTrash size={14} />
+                          </ActionIcon>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            ) : (
+              <Text size="sm" c="dimmed">
+                No additional members
+              </Text>
+            )}
+          </Stack>
+        </Card>
+      )}
 
       <Group justify="space-between">
         <Title order={3}>Expenses</Title>
@@ -499,50 +510,52 @@ export default function EnvelopeDetailPage({
         </Card>
       )}
 
-      <Modal
-        opened={inviteModalOpen}
-        onClose={() => {
-          setInviteModalOpen(false);
-          inviteForm.reset();
-        }}
-        title="Invite Member to Envelope"
-      >
-        <form onSubmit={inviteForm.onSubmit(handleInvite)}>
-          <Stack>
-            <TextInput
-              label="Email Address"
-              placeholder="user@example.com"
-              required
-              {...inviteForm.getInputProps("email")}
-            />
+      {canManage && (
+        <Modal
+          opened={inviteModalOpen}
+          onClose={() => {
+            setInviteModalOpen(false);
+            inviteForm.reset();
+          }}
+          title="Invite Member to Envelope"
+        >
+          <form onSubmit={inviteForm.onSubmit(handleInvite)}>
+            <Stack>
+              <TextInput
+                label="Email Address"
+                placeholder="user@example.com"
+                required
+                {...inviteForm.getInputProps("email")}
+              />
 
-            <Select
-              label="Role"
-              description="Admins can manage settings and invite others. Users can only add expenses."
-              data={[
-                { value: "ADMIN", label: "Admin" },
-                { value: "USER", label: "User" },
-              ]}
-              {...inviteForm.getInputProps("role")}
-            />
+              <Select
+                label="Role"
+                description="Admins can manage settings and invite others. Users can only add expenses."
+                data={[
+                  { value: "ADMIN", label: "Admin" },
+                  { value: "USER", label: "User" },
+                ]}
+                {...inviteForm.getInputProps("role")}
+              />
 
-            <Group justify="flex-end" mt="md">
-              <Button 
-                variant="subtle" 
-                onClick={() => {
-                  setInviteModalOpen(false);
-                  inviteForm.reset();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" loading={inviteLoading}>
-                Send Invite
-              </Button>
-            </Group>
-          </Stack>
-        </form>
-      </Modal>
+              <Group justify="flex-end" mt="md">
+                <Button 
+                  variant="subtle" 
+                  onClick={() => {
+                    setInviteModalOpen(false);
+                    inviteForm.reset();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" loading={inviteLoading}>
+                  Send Invite
+                </Button>
+              </Group>
+            </Stack>
+          </form>
+        </Modal>
+      )}
     </Stack>
   );
 }

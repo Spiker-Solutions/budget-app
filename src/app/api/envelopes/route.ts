@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { createEnvelopeSchema } from "@/lib/validations";
+import { canManageBudget } from "@/lib/permissions";
 
 async function checkBudgetAccess(budgetId: string, userId: string) {
   const membership = await prisma.budgetUser.findUnique({
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
     }
 
-    if (membership.role !== "ADMIN" && membership.role !== "OWNER") {
+    if (!canManageBudget(membership.role)) {
       return NextResponse.json(
         errorResponse("Only admins and owners can create envelopes"),
         { status: 403 }
