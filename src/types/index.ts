@@ -66,6 +66,7 @@ export interface UpdateBudgetInput {
 export interface CreateEnvelopeInput {
   name: string;
   allocation: number;
+  allocationType?: "AMOUNT" | "PERCENTAGE";
   description?: string;
   budgetId: string;
   carryOverRemainder?: boolean | null;
@@ -74,6 +75,7 @@ export interface CreateEnvelopeInput {
 export interface UpdateEnvelopeInput {
   name?: string;
   allocation?: number;
+  allocationType?: "AMOUNT" | "PERCENTAGE";
   description?: string;
   carryOverRemainder?: boolean | null;
 }

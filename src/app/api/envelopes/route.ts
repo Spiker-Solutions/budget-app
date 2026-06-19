@@ -100,7 +100,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, allocation, description, budgetId, carryOverRemainder } = result.data;
+    const { name, allocation, allocationType, description, budgetId, carryOverRemainder } =
+      result.data;
 
     const membership = await checkBudgetAccess(budgetId, session.user.id);
 
@@ -119,6 +120,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         allocation,
+        allocationType,
         description,
         budgetId,
         ...(carryOverRemainder !== undefined ? { carryOverRemainder } : {}),

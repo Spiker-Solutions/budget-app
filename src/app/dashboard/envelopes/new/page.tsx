@@ -12,6 +12,7 @@ import {
   Button,
   Group,
   Select,
+  SegmentedControl,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
@@ -23,7 +24,10 @@ import { useUiStore } from "@/stores/uiStore";
 import { canManageBudget, getMembershipRole } from "@/lib/permissions";
 import type { CreateEnvelopeInput } from "@/types";
 
-type EnvelopeFormValues = Omit<CreateEnvelopeInput, "budgetId" | "carryOverRemainder"> & {
+type EnvelopeFormValues = Omit<
+  CreateEnvelopeInput,
+  "budgetId" | "carryOverRemainder"
+> & {
   carryMode: "inherit" | "on" | "off";
 };
 
@@ -56,13 +60,20 @@ export default function NewEnvelopePage() {
     initialValues: {
       name: "",
       allocation: 0,
+      allocationType: "AMOUNT",
       description: "",
       carryMode: "inherit",
     },
     validate: {
       name: (value) => (value.length < 1 ? "Name is required" : null),
-      allocation: (value) =>
-        value <= 0 ? "Allocation must be greater than 0" : null,
+      allocation: (value, values) => {
+        if (values.allocationType === "PERCENTAGE") {
+          return value <= 0 || value > 100
+            ? "Percentage must be between 0 and 100"
+            : null;
+        }
+        return value <= 0 ? "Allocation must be greater than 0" : null;
+      },
     },
   });
 
@@ -144,16 +155,37 @@ export default function NewEnvelopePage() {
               {...form.getInputProps("name")}
             />
 
+            <SegmentedControl
+              value={form.values.allocationType}
+              onChange={(value) =>
+                form.setFieldValue("allocationType", value as "AMOUNT" | "PERCENTAGE")
+              }
+              data={[
+                { label: "Fixed amount", value: "AMOUNT" },
+                { label: "Percentage", value: "PERCENTAGE" },
+              ]}
+            />
+
             <NumberInput
-              label="Budget Allocation"
-              placeholder="0.00"
-              description="How much to allocate for this envelope"
+              label={
+                form.values.allocationType === "PERCENTAGE"
+                  ? "Budget percentage"
+                  : "Budget allocation"
+              }
+              placeholder={form.values.allocationType === "PERCENTAGE" ? "0" : "0.00"}
+              description={
+                form.values.allocationType === "PERCENTAGE"
+                  ? "Share of the budget amount for this envelope"
+                  : "How much to allocate for this envelope"
+              }
               required
               min={0}
-              decimalScale={2}
-              fixedDecimalScale
-              prefix="$"
-              thousandSeparator=","
+              max={form.values.allocationType === "PERCENTAGE" ? 100 : undefined}
+              decimalScale={form.values.allocationType === "PERCENTAGE" ? 2 : 2}
+              fixedDecimalScale={form.values.allocationType === "AMOUNT"}
+              prefix={form.values.allocationType === "AMOUNT" ? "$" : undefined}
+              suffix={form.values.allocationType === "PERCENTAGE" ? "%" : undefined}
+              thousandSeparator={form.values.allocationType === "AMOUNT" ? "," : undefined}
               {...form.getInputProps("allocation")}
             />
 
