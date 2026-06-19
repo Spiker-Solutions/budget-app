@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { updateEnvelopeSchema } from "@/lib/validations";
+import { canManageEnvelope } from "@/lib/permissions";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -29,7 +30,10 @@ async function checkEnvelopeAccess(envelopeId: string, userId: string) {
 
   if (!budgetMembership && !envelopeMembership) return null;
 
-  const isAdmin = budgetMembership?.role === "ADMIN" || envelopeMembership?.role === "ADMIN";
+  const isAdmin = canManageEnvelope(
+    budgetMembership?.role,
+    envelopeMembership?.role
+  );
 
   return { envelope, isAdmin };
 }

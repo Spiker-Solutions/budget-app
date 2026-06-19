@@ -23,10 +23,12 @@ import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { IconArrowLeft, IconTrash, IconUserPlus } from "@tabler/icons-react";
 import Link from "next/link";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { useUiStore } from "@/stores/uiStore";
+import { canManageBudget, getMembershipRole } from "@/lib/permissions";
 import type { UpdateBudgetInput } from "@/types";
 
 const periodTypeOptions = [
@@ -59,13 +61,29 @@ function getOrdinalSuffix(n: number): string {
 
 export default function BudgetSettingsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
-  const { budgets, updateBudget, fetchBudgets } = useBudgetStore();
+  const { budgets, updateBudget, fetchBudgets, isLoading: budgetsLoading } = useBudgetStore();
   const { currentBudgetId } = useUiStore();
 
   const currentBudget = budgets.find((b) => b.id === currentBudgetId);
+  const userRole = getMembershipRole(currentBudget?.members, session?.user?.id);
+  const canManage = canManageBudget(userRole);
+
+  useEffect(() => {
+    if (budgetsLoading || !session?.user?.id || !currentBudget) return;
+
+    if (!canManage) {
+      notifications.show({
+        title: "Access denied",
+        message: "Only budget owners and admins can access settings",
+        color: "red",
+      });
+      router.replace("/dashboard");
+    }
+  }, [budgetsLoading, session?.user?.id, currentBudget, canManage, router]);
 
   const inviteForm = useForm({
     initialValues: {
@@ -230,6 +248,10 @@ export default function BudgetSettingsPage() {
         </Button>
       </Stack>
     );
+  }
+
+  if (budgetsLoading || !canManage) {
+    return null;
   }
 
   const periodType = form.values.periodType;
