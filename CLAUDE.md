@@ -14,14 +14,14 @@ This document provides guidelines for AI agents working on this codebase.
   Copy the example environment file:
    Then configure the following variables in `.env`:
 
-  | Variable               | Description                           | Where to Get It                                                                           |
-  | ---------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------- |
-  | `DATABASE_URL`         | PostgreSQL connection string          | Neon: pooled URL. Local Docker: same as below.                                            |
-  | `DIRECT_URL`           | Direct (non-pooled) URL for migrations | Required when using Neon pooler for `DATABASE_URL`. Local: same as `DATABASE_URL`.       |
-  | `NEXTAUTH_URL`         | Your application URL                  | `http://localhost:3000` for local development                                             |
-  | `NEXTAUTH_SECRET`      | Random secret for NextAuth.js         | Generate with: `openssl rand -base64 32`                                                  |
-  | `GOOGLE_CLIENT_ID`     | Google OAuth client ID (optional)     | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials |
-  | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (optional) | Same as above                                                                             |
+  | Variable               | Description                            | Where to Get It                                                                           |
+  | ---------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------- |
+  | `DATABASE_URL`         | PostgreSQL connection string           | Neon: pooled URL. Local Docker: same as below.                                            |
+  | `DIRECT_URL`           | Direct (non-pooled) URL for migrations | Required when using Neon pooler for `DATABASE_URL`. Local: same as `DATABASE_URL`.        |
+  | `NEXTAUTH_URL`         | Your application URL                   | `http://localhost:3000` for local development                                             |
+  | `NEXTAUTH_SECRET`      | Random secret for NextAuth.js          | Generate with: `openssl rand -base64 32`                                                  |
+  | `GOOGLE_CLIENT_ID`     | Google OAuth client ID (optional)      | [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials |
+  | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (optional)  | Same as above                                                                             |
 
 
 ### Database Setup with Docker
