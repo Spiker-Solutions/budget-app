@@ -22,6 +22,9 @@ import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { useUiStore } from "@/stores/uiStore";
 import { canManageBudget, getMembershipRole } from "@/lib/permissions";
+import { IconPicker } from "@/components/envelopes/IconPicker";
+import { ColorPicker } from "@/components/envelopes/ColorPicker";
+import { DEFAULT_ENVELOPE_COLOR } from "@/lib/envelope-colors";
 import type { CreateEnvelopeInput } from "@/types";
 
 type EnvelopeFormValues = Omit<
@@ -59,6 +62,8 @@ export default function NewEnvelopePage() {
   const form = useForm<EnvelopeFormValues>({
     initialValues: {
       name: "",
+      icon: null,
+      color: DEFAULT_ENVELOPE_COLOR,
       allocation: 0,
       allocationType: "AMOUNT",
       description: "",
@@ -154,6 +159,33 @@ export default function NewEnvelopePage() {
               required
               {...form.getInputProps("name")}
             />
+
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Color
+              </Text>
+              <Text size="xs" c="dimmed" mb="sm">
+                Accent color for this envelope&apos;s icon
+              </Text>
+              <ColorPicker
+                value={form.values.color ?? DEFAULT_ENVELOPE_COLOR}
+                onChange={(color) => form.setFieldValue("color", color)}
+              />
+            </div>
+
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Icon
+              </Text>
+              <Text size="xs" c="dimmed" mb="sm">
+                Optional — pick an icon to identify this envelope
+              </Text>
+              <IconPicker
+                value={form.values.icon ?? null}
+                color={form.values.color}
+                onChange={(icon) => form.setFieldValue("icon", icon)}
+              />
+            </div>
 
             <SegmentedControl
               value={form.values.allocationType}

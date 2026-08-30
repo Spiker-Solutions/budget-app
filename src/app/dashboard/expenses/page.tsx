@@ -22,6 +22,8 @@ import { formatCurrency } from "@/lib/client-utils";
 import { filterExpensesInRange } from "@/lib/budget-period";
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
+import { ExpenseCreatorBadge } from "@/components/expenses/ExpenseCreatorBadge";
+import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import dayjs from "dayjs";
 
 export default function ExpensesPage() {
@@ -160,6 +162,7 @@ export default function ExpensesPage() {
                 <Table.Th>Payee</Table.Th>
                 <Table.Th>Envelope</Table.Th>
                 <Table.Th>Description</Table.Th>
+                <Table.Th>Added by</Table.Th>
                 <Table.Th style={{ textAlign: "right" }}>Amount</Table.Th>
                 <Table.Th style={{ width: "50px" }}></Table.Th>
               </Table.Tr>
@@ -180,7 +183,10 @@ export default function ExpensesPage() {
                   </Table.Td>
                   <Table.Td>
                     {expense.envelope ? (
-                      <Badge variant="light">{expense.envelope.name}</Badge>
+                      <Group gap="xs" wrap="nowrap">
+                        <EnvelopeIcon icon={expense.envelope.icon} color={expense.envelope.color} size={16} />
+                        <Badge variant="light">{expense.envelope.name}</Badge>
+                      </Group>
                     ) : (
                       <Text c="dimmed" size="sm">
                         Unassigned
@@ -191,6 +197,15 @@ export default function ExpensesPage() {
                     <Text size="sm" lineClamp={1}>
                       {expense.description || "-"}
                     </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {expense.createdBy ? (
+                      <ExpenseCreatorBadge user={expense.createdBy} />
+                    ) : (
+                      <Text c="dimmed" size="sm">
+                        -
+                      </Text>
+                    )}
                   </Table.Td>
                   <Table.Td style={{ textAlign: "right" }}>
                     <Text fw={500}>

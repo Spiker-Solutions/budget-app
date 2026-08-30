@@ -65,6 +65,8 @@ export interface UpdateBudgetInput {
 
 export interface CreateEnvelopeInput {
   name: string;
+  icon?: string | null;
+  color?: string | null;
   allocation: number;
   allocationType?: "AMOUNT" | "PERCENTAGE";
   description?: string;
@@ -74,6 +76,8 @@ export interface CreateEnvelopeInput {
 
 export interface UpdateEnvelopeInput {
   name?: string;
+  icon?: string | null;
+  color?: string | null;
   allocation?: number;
   allocationType?: "AMOUNT" | "PERCENTAGE";
   description?: string;

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { ENVELOPE_ICON_NAMES } from "@/lib/envelope-icons";
+import { ENVELOPE_COLORS } from "@/lib/envelope-colors";
 
 export const createBudgetSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -42,6 +44,8 @@ const envelopeAllocationRefinement = (
 
 const envelopeSchemaBase = z.object({
   name: z.string().min(1, "Name is required").max(100),
+  icon: z.enum(ENVELOPE_ICON_NAMES as [string, ...string[]]).nullable().optional(),
+  color: z.enum([...ENVELOPE_COLORS]).nullable().optional(),
   allocation: z.number(),
   allocationType: allocationTypeSchema.optional().default("AMOUNT"),
   description: z.string().max(500).optional(),
