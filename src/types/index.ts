@@ -94,13 +94,14 @@ export interface CreateExpenseInput {
 
 export interface UpdateExpenseInput {
   amount?: number;
-  payeeId?: string;
+  payee?: string;
   description?: string;
   location?: string;
   date?: Date;
   envelopeId?: string;
+  budgetId?: string;
   isRecurring?: boolean;
-  recurrence?: RecurrenceType;
+  recurrence?: "NONE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY";
 }
 
 export interface CreatePayeeInput {

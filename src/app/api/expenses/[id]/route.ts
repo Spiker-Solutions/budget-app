@@ -128,9 +128,65 @@ export async function PATCH(
       );
     }
 
-    const updateData: Record<string, unknown> = { ...result.data };
-    if (result.data.date) {
-      updateData.date = new Date(result.data.date);
+    const {
+      payee,
+      budgetId: _budgetId,
+      date,
+      recurrence,
+      envelopeId,
+      ...rest
+    } = result.data;
+
+    const budgetId = access.expense.envelope.budgetId;
+
+    if (envelopeId && envelopeId !== access.expense.envelopeId) {
+      const envelope = await prisma.envelope.findUnique({
+        where: { id: envelopeId },
+      });
+      if (!envelope || envelope.budgetId !== budgetId) {
+        return NextResponse.json(
+          errorResponse("Envelope not found"),
+          { status: 404 }
+        );
+      }
+    }
+
+    const updateData: Record<string, unknown> = { ...rest };
+
+    if (envelopeId) {
+      updateData.envelopeId = envelopeId;
+    }
+
+    if (date) {
+      updateData.date = new Date(date);
+    }
+
+    if (recurrence !== undefined) {
+      updateData.recurrence = recurrence === "NONE" ? null : recurrence;
+    }
+
+    if (payee !== undefined) {
+      const normalizedPayeeName = payee.trim().toLowerCase();
+      let payeeRecord = await prisma.payee.findUnique({
+        where: {
+          budgetId_normalizedName: {
+            budgetId,
+            normalizedName: normalizedPayeeName,
+          },
+        },
+      });
+
+      if (!payeeRecord) {
+        payeeRecord = await prisma.payee.create({
+          data: {
+            name: payee.trim(),
+            normalizedName: normalizedPayeeName,
+            budgetId,
+          },
+        });
+      }
+
+      updateData.payeeId = payeeRecord.id;
     }
 
     const expense = await prisma.expense.update({
