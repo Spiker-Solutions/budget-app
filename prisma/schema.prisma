@@ -121,6 +121,8 @@ enum AllocationType {
 model Envelope {
   id          String  @id @default(cuid())
   name        String
+  icon        String?
+  color       String? @default("blue")
   allocation  Decimal @db.Decimal(12, 2)
   allocationType AllocationType @default(AMOUNT)
   description String?

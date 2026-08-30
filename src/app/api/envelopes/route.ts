@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, allocation, allocationType, description, budgetId, carryOverRemainder } =
+    const { name, icon, color, allocation, allocationType, description, budgetId, carryOverRemainder } =
       result.data;
 
     const membership = await checkBudgetAccess(budgetId, session.user.id);
@@ -119,6 +119,8 @@ export async function POST(req: NextRequest) {
     const envelope = await prisma.envelope.create({
       data: {
         name,
+        icon: icon ?? null,
+        color: color ?? "blue",
         allocation,
         allocationType,
         description,

@@ -24,6 +24,9 @@ import Link from "next/link";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
+import { IconPicker } from "@/components/envelopes/IconPicker";
+import { ColorPicker } from "@/components/envelopes/ColorPicker";
+import { DEFAULT_ENVELOPE_COLOR } from "@/lib/envelope-colors";
 import type { UpdateEnvelopeInput } from "@/types";
 
 type EnvelopeEditFormValues = Omit<UpdateEnvelopeInput, "carryOverRemainder"> & {
@@ -51,6 +54,8 @@ export default function EditEnvelopePage({
   const form = useForm<EnvelopeEditFormValues>({
     initialValues: {
       name: "",
+      icon: null,
+      color: DEFAULT_ENVELOPE_COLOR,
       allocation: 0,
       allocationType: "AMOUNT",
       description: "",
@@ -97,6 +102,8 @@ export default function EditEnvelopePage({
           setEnvelope(envelopeData);
           form.setValues({
             name: envelopeData.name,
+            icon: envelopeData.icon ?? null,
+            color: envelopeData.color ?? DEFAULT_ENVELOPE_COLOR,
             allocation: Number(envelopeData.allocation),
             allocationType: envelopeData.allocationType ?? "AMOUNT",
             description: envelopeData.description || "",
@@ -200,6 +207,33 @@ export default function EditEnvelopePage({
               required
               {...form.getInputProps("name")}
             />
+
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Color
+              </Text>
+              <Text size="xs" c="dimmed" mb="sm">
+                Accent color for this envelope&apos;s icon
+              </Text>
+              <ColorPicker
+                value={form.values.color ?? DEFAULT_ENVELOPE_COLOR}
+                onChange={(color) => form.setFieldValue("color", color)}
+              />
+            </div>
+
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Icon
+              </Text>
+              <Text size="xs" c="dimmed" mb="sm">
+                Optional — pick an icon to identify this envelope
+              </Text>
+              <IconPicker
+                value={form.values.icon ?? null}
+                color={form.values.color}
+                onChange={(icon) => form.setFieldValue("icon", icon)}
+              />
+            </div>
 
             <SegmentedControl
               value={form.values.allocationType ?? "AMOUNT"}

@@ -130,14 +130,14 @@ async function main() {
   });
 
   const householdEnvelopes = [
-    { name: "Groceries", allocation: 850, description: "Supermarket and bulk shopping" },
-    { name: "Dining Out", allocation: 350, description: "Restaurants, coffee, takeout" },
-    { name: "Utilities", allocation: 450, description: "Electric, gas, water, internet" },
-    { name: "Transportation", allocation: 400, description: "Gas, transit, rideshare" },
-    { name: "Entertainment", allocation: 250, description: "Streaming, movies, hobbies" },
-    { name: "Health & Wellness", allocation: 200, description: "Pharmacy, gym, copays" },
-    { name: "Home & Maintenance", allocation: 300, description: "Repairs, supplies, decor" },
-    { name: "Miscellaneous", allocation: 200, description: "Everything else" },
+    { name: "Groceries", icon: "shopping-cart", color: "green", allocation: 850, description: "Supermarket and bulk shopping" },
+    { name: "Dining Out", icon: "tools-kitchen-2", color: "orange", allocation: 350, description: "Restaurants, coffee, takeout" },
+    { name: "Utilities", icon: "bolt", color: "yellow", allocation: 450, description: "Electric, gas, water, internet" },
+    { name: "Transportation", icon: "car", color: "cyan", allocation: 400, description: "Gas, transit, rideshare" },
+    { name: "Entertainment", icon: "movie", color: "violet", allocation: 250, description: "Streaming, movies, hobbies" },
+    { name: "Health & Wellness", icon: "heart", color: "pink", allocation: 200, description: "Pharmacy, gym, copays" },
+    { name: "Home & Maintenance", icon: "home", color: "teal", allocation: 300, description: "Repairs, supplies, decor" },
+    { name: "Miscellaneous", icon: "dots", color: "gray", allocation: 200, description: "Everything else" },
   ];
 
   const envelopeRecords: Array<{ id: string; name: string }> = [];
@@ -178,6 +178,8 @@ async function main() {
   const vacationEnvelope = await prisma.envelope.create({
     data: {
       name: "Trip Savings",
+      icon: "plane",
+      color: "blue",
       allocation: 600,
       description: "Flights, hotels, activities",
       budgetId: vacationBudget.id,

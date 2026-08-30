@@ -38,6 +38,8 @@ import { useBudgetStore } from "@/stores/budgetStore";
 import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
 import { computeCarryAndPeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
+import { ExpenseCreatorBadge } from "@/components/expenses/ExpenseCreatorBadge";
+import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import dayjs from "dayjs";
 
 export default function EnvelopeDetailPage({
@@ -284,8 +286,10 @@ export default function EnvelopeDetailPage({
       <Card withBorder>
         <Stack>
           <Group justify="space-between">
-            <div>
-              <Title order={2}>{envelope.name}</Title>
+            <Group gap="md">
+              <EnvelopeIcon icon={envelope.icon} color={envelope.color} size={24} />
+              <div>
+                <Title order={2}>{envelope.name}</Title>
               {envelope.description && (
                 <Text c="dimmed">{envelope.description}</Text>
               )}
@@ -296,6 +300,7 @@ export default function EnvelopeDetailPage({
                 </Text>
               )}
             </div>
+            </Group>
             <Badge
               size="xl"
               color={
@@ -460,6 +465,7 @@ export default function EnvelopeDetailPage({
                 <Table.Th>Date</Table.Th>
                 <Table.Th>Payee</Table.Th>
                 <Table.Th>Description</Table.Th>
+                <Table.Th>Added by</Table.Th>
                 <Table.Th style={{ textAlign: "right" }}>Amount</Table.Th>
                 <Table.Th style={{ width: "50px" }}></Table.Th>
               </Table.Tr>
@@ -482,6 +488,15 @@ export default function EnvelopeDetailPage({
                     <Text size="sm" lineClamp={1}>
                       {expense.description || "-"}
                     </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    {expense.createdBy ? (
+                      <ExpenseCreatorBadge user={expense.createdBy} />
+                    ) : (
+                      <Text c="dimmed" size="sm">
+                        -
+                      </Text>
+                    )}
                   </Table.Td>
                   <Table.Td style={{ textAlign: "right" }}>
                     <Text fw={500}>

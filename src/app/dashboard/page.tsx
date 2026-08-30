@@ -26,6 +26,7 @@ import { formatCurrency } from "@/lib/client-utils";
 import { type EnvelopePeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
+import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -278,7 +279,10 @@ export default function DashboardPage() {
                 style={{ textDecoration: "none", color: "inherit" }}
               >
                 <Group justify="space-between" mb="xs">
-                  <Text fw={500}>{envelope.name}</Text>
+                  <Group gap="xs">
+                    <EnvelopeIcon icon={envelope.icon} color={envelope.color} size={16} />
+                    <Text fw={500}>{envelope.name}</Text>
+                  </Group>
                   <Badge
                     color={
                       envelopePercentage > 100
