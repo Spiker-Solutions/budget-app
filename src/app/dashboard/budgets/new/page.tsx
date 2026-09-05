@@ -14,7 +14,7 @@ import {
   Group,
   Switch,
 } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
+import { DateField } from "@/components/shared/DateField";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
@@ -183,10 +183,9 @@ export default function NewBudgetPage() {
                   max={365}
                   {...form.getInputProps("customDays")}
                 />
-                <DatePickerInput
+                <DateField
                   label="Period Start Date"
-                  description="When does this budget period start?"
-                  placeholder="Pick a date"
+                  description="When does this budget period start? Type MM/DD/YYYY or pick from the calendar."
                   {...form.getInputProps("startDate")}
                 />
               </>

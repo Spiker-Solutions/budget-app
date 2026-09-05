@@ -14,7 +14,7 @@ import {
   Select,
   Autocomplete,
 } from "@mantine/core";
-import { DatePickerInput } from "@mantine/dates";
+import { DateField } from "@/components/shared/DateField";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
@@ -178,9 +178,9 @@ export default function NewExpensePage() {
               {...form.getInputProps("envelopeId")}
             />
 
-            <DatePickerInput
+            <DateField
               label="Date"
-              placeholder="Pick date"
+              description="Type MM/DD/YYYY or pick from the calendar"
               {...form.getInputProps("date")}
             />
 
