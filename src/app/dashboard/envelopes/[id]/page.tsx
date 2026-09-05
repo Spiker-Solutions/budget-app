@@ -436,7 +436,7 @@ export default function EnvelopeDetailPage({
         <Title order={3}>Expenses</Title>
         <Button
           component={Link}
-          href="/dashboard/expenses/new"
+          href={`/dashboard/expenses/new?envelopeId=${params.id}`}
           leftSection={<IconPlus size={18} />}
         >
           Add Expense
@@ -449,7 +449,7 @@ export default function EnvelopeDetailPage({
             <Text c="dimmed">No expenses in this envelope yet</Text>
             <Button
               component={Link}
-              href="/dashboard/expenses/new"
+              href={`/dashboard/expenses/new?envelopeId=${params.id}`}
               leftSection={<IconPlus size={18} />}
               variant="light"
             >
