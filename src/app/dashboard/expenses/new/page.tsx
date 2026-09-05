@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   Title,
   Text,
   Card,
   Stack,
-  NumberInput,
   Textarea,
   TextInput,
   Button,
@@ -17,7 +16,8 @@ import {
 import { DatePickerInput } from "@mantine/dates";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AmountInput } from "@/components/shared/AmountInput";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -32,13 +32,18 @@ const recurrenceOptions = [
   { value: "YEARLY", label: "Yearly" },
 ];
 
-export default function NewExpensePage() {
+function NewExpenseForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const envelopeIdParam = searchParams.get("envelopeId") ?? "";
   const [loading, setLoading] = useState(false);
   const [payeeOptions, setPayeeOptions] = useState<string[]>([]);
   const { createExpense, fetchExpenses } = useExpenseStore();
   const { envelopes, fetchEnvelopes } = useEnvelopeStore();
   const { currentBudgetId } = useUiStore();
+  // Tracks which button triggered the submit so we know whether to stay on
+  // the page (to add another expense) or navigate away.
+  const addAnotherRef = useRef(false);
 
   useEffect(() => {
     if (currentBudgetId) {
@@ -69,7 +74,7 @@ export default function NewExpensePage() {
       payee: "",
       description: "",
       location: "",
-      envelopeId: "",
+      envelopeId: envelopeIdParam,
       date: new Date(),
       recurrence: "NONE",
     },
@@ -79,6 +84,14 @@ export default function NewExpensePage() {
       envelopeId: (value) => (!value || value.length < 1 ? "Envelope is required" : null),
     },
   });
+
+  // Keep the envelope field in sync when arriving from an envelope page.
+  useEffect(() => {
+    if (envelopeIdParam) {
+      form.setFieldValue("envelopeId", envelopeIdParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [envelopeIdParam]);
 
   const handleSubmit = async (
     values: Omit<CreateExpenseInput, "budgetId">
@@ -92,6 +105,7 @@ export default function NewExpensePage() {
       return;
     }
 
+    const addAnother = addAnotherRef.current;
     setLoading(true);
 
     try {
@@ -108,7 +122,22 @@ export default function NewExpensePage() {
           color: "green",
         });
         await fetchExpenses(undefined, currentBudgetId);
-        router.push("/dashboard");
+
+        if (addAnother) {
+          // Reset the form for the next entry but keep the envelope and date
+          // so multiple expenses can be added quickly to the same envelope.
+          const keepEnvelopeId = values.envelopeId;
+          const keepDate = values.date;
+          form.reset();
+          form.setFieldValue("envelopeId", keepEnvelopeId);
+          form.setFieldValue("date", keepDate ?? new Date());
+        } else {
+          router.push(
+            envelopeIdParam
+              ? `/dashboard/envelopes/${envelopeIdParam}`
+              : "/dashboard"
+          );
+        }
       } else {
         notifications.show({
           title: "Error",
@@ -147,9 +176,13 @@ export default function NewExpensePage() {
       <Text c="dimmed">Record a new expense for your budget.</Text>
 
       <Card withBorder maw={600}>
-        <form onSubmit={form.onSubmit(handleSubmit)}>
+        <form
+          onSubmit={form.onSubmit((values) => {
+            void handleSubmit(values);
+          })}
+        >
           <Stack>
-            <NumberInput
+            <AmountInput
               label="Amount"
               placeholder="0.00"
               required
@@ -203,16 +236,44 @@ export default function NewExpensePage() {
             />
 
             <Group justify="flex-end" mt="md">
-              <Button variant="subtle" onClick={() => router.back()}>
+              <Button
+                variant="subtle"
+                onClick={() => router.back()}
+                disabled={loading}
+              >
                 Cancel
               </Button>
-              <Button type="submit" loading={loading}>
-                Add Expense
+              <Button
+                type="submit"
+                variant="light"
+                loading={loading}
+                onClick={() => {
+                  addAnotherRef.current = true;
+                }}
+              >
+                Save &amp; Add Another
+              </Button>
+              <Button
+                type="submit"
+                loading={loading}
+                onClick={() => {
+                  addAnotherRef.current = false;
+                }}
+              >
+                Save
               </Button>
             </Group>
           </Stack>
         </form>
       </Card>
     </Stack>
+  );
+}
+
+export default function NewExpensePage() {
+  return (
+    <Suspense fallback={null}>
+      <NewExpenseForm />
+    </Suspense>
   );
 }

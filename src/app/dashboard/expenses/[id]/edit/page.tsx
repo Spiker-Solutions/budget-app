@@ -6,7 +6,6 @@ import {
   Text,
   Card,
   Stack,
-  NumberInput,
   Textarea,
   TextInput,
   Button,
@@ -21,6 +20,7 @@ import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconArrowLeft } from "@tabler/icons-react";
+import { AmountInput } from "@/components/shared/AmountInput";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -225,7 +225,7 @@ export default function EditExpensePage({
       <Card withBorder maw={600}>
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Stack>
-            <NumberInput
+            <AmountInput
               label="Amount"
               placeholder="0.00"
               required
