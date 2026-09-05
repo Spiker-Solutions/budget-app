@@ -7,7 +7,6 @@ import {
   Card,
   Stack,
   TextInput,
-  NumberInput,
   Textarea,
   Select,
   Button,
@@ -29,6 +28,7 @@ import Link from "next/link";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { useUiStore } from "@/stores/uiStore";
 import { canManageBudget, getMembershipRole } from "@/lib/permissions";
+import { AmountInput } from "@/components/shared/AmountInput";
 import type { UpdateBudgetInput } from "@/types";
 
 const periodTypeOptions = [
@@ -284,7 +284,7 @@ export default function BudgetSettingsPage() {
               {...form.getInputProps("name")}
             />
 
-            <NumberInput
+            <AmountInput
               label="Budget Amount"
               placeholder="0.00"
               required
@@ -338,7 +338,7 @@ export default function BudgetSettingsPage() {
 
             {periodType === "CUSTOM" && (
               <>
-                <NumberInput
+                <AmountInput
                   label="Custom Period Length"
                   description="Number of days in each budget period"
                   min={1}

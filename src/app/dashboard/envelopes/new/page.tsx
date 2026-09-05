@@ -7,7 +7,6 @@ import {
   Card,
   Stack,
   TextInput,
-  NumberInput,
   Textarea,
   Button,
   Group,
@@ -24,6 +23,7 @@ import { useUiStore } from "@/stores/uiStore";
 import { canManageBudget, getMembershipRole } from "@/lib/permissions";
 import { IconPicker } from "@/components/envelopes/IconPicker";
 import { ColorPicker } from "@/components/envelopes/ColorPicker";
+import { AmountInput } from "@/components/shared/AmountInput";
 import { DEFAULT_ENVELOPE_COLOR } from "@/lib/envelope-colors";
 import type { CreateEnvelopeInput } from "@/types";
 
@@ -198,7 +198,7 @@ export default function NewEnvelopePage() {
               ]}
             />
 
-            <NumberInput
+            <AmountInput
               label={
                 form.values.allocationType === "PERCENTAGE"
                   ? "Budget percentage"
