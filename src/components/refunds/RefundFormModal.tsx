@@ -141,6 +141,10 @@ export function RefundFormModal({
             required
             min={0}
             max={maxRefundable}
+            // Mantine clamps to max on blur by default, which would silently
+            // rewrite an over-refund into the largest allowed value. Keeping
+            // the typed amount lets the validation message explain the limit.
+            clampBehavior="none"
             decimalScale={2}
             fixedDecimalScale
             prefix="$"

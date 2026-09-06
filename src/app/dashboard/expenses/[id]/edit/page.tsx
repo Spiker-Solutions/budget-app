@@ -269,6 +269,10 @@ export default function EditExpensePage({
               placeholder="0.00"
               required
               min={refundedTotal > 0 ? refundedTotal : 0}
+              // Without this, Mantine clamps up to `min` on blur, so lowering
+              // the amount below the refunded total would silently snap back
+              // and appear to save successfully.
+              clampBehavior="none"
               decimalScale={2}
               fixedDecimalScale
               prefix="$"
