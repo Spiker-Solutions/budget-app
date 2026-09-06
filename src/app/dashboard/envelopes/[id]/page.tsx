@@ -24,6 +24,7 @@ import {
   IconEdit,
   IconPlus,
   IconDots,
+  IconReceiptRefund,
   IconTrash,
   IconUserPlus,
 } from "@tabler/icons-react";
@@ -38,7 +39,10 @@ import { useBudgetStore } from "@/stores/budgetStore";
 import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
 import { computeCarryAndPeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
+import { getRefundSummary, sumRefundAmounts } from "@/lib/refunds";
 import { ExpenseCreatorBadge } from "@/components/expenses/ExpenseCreatorBadge";
+import { ExpenseAmountCell } from "@/components/refunds/ExpenseAmountCell";
+import { RefundStatusBadge } from "@/components/refunds/RefundStatusBadge";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import dayjs from "dayjs";
 
@@ -214,6 +218,7 @@ export default function EnvelopeDetailPage({
       envelopeId: e.envelopeId,
       date: new Date(e.date),
       amount: Number(e.amount),
+      refundedAmount: sumRefundAmounts(e.refunds),
     }));
     return computeCarryAndPeriodTotals(
       budgetInput,
@@ -256,6 +261,8 @@ export default function EnvelopeDetailPage({
   const carriedFromPrior = envPeriod?.carriedFromPrior ?? 0;
   const availableThisPeriod = envPeriod?.availableThisPeriod ?? allocation;
   const totalSpentThisPeriod = envPeriod?.spentThisPeriod ?? 0;
+  const grossSpentThisPeriod = envPeriod?.grossSpentThisPeriod ?? totalSpentThisPeriod;
+  const refundedThisPeriod = envPeriod?.refundedThisPeriod ?? 0;
   const remaining = envPeriod?.remainingThisPeriod ?? allocation - totalSpentThisPeriod;
   const percentage =
     availableThisPeriod > 0 ? (totalSpentThisPeriod / availableThisPeriod) * 100 : 0;
@@ -346,6 +353,12 @@ export default function EnvelopeDetailPage({
               >
                 {formatCurrency(totalSpentThisPeriod, budget?.currency)}
               </Text>
+              {refundedThisPeriod > 0 && (
+                <Text size="xs" c="dimmed">
+                  {formatCurrency(grossSpentThisPeriod, budget?.currency)} less{" "}
+                  {formatCurrency(refundedThisPeriod, budget?.currency)} refunded
+                </Text>
+              )}
             </div>
             <div>
               <Text size="sm" c="dimmed">
@@ -477,7 +490,10 @@ export default function EnvelopeDetailPage({
                     {dayjs(expense.date).format("MMM D, YYYY")}
                   </Table.Td>
                   <Table.Td>
-                    <Text fw={500}>{expense.payee.name}</Text>
+                    <Group gap="xs" wrap="nowrap">
+                      <Text fw={500}>{expense.payee.name}</Text>
+                      <RefundStatusBadge status={getRefundSummary(expense).status} />
+                    </Group>
                     {expense.location && (
                       <Text size="xs" c="dimmed">
                         {expense.location}
@@ -499,12 +515,7 @@ export default function EnvelopeDetailPage({
                     )}
                   </Table.Td>
                   <Table.Td style={{ textAlign: "right" }}>
-                    <Text fw={500}>
-                      {formatCurrency(
-                        Number(expense.amount),
-                        budget?.currency
-                      )}
-                    </Text>
+                    <ExpenseAmountCell expense={expense} currency={budget?.currency} />
                   </Table.Td>
                   <Table.Td>
                     <Menu position="bottom-end" withinPortal>
@@ -520,6 +531,13 @@ export default function EnvelopeDetailPage({
                           href={`/dashboard/expenses/${expense.id}/edit`}
                         >
                           Edit
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconReceiptRefund size={14} />}
+                          component={Link}
+                          href={`/dashboard/expenses/${expense.id}/edit#refunds`}
+                        >
+                          Refunds
                         </Menu.Item>
                         <Menu.Item
                           leftSection={<IconTrash size={14} />}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Title,
   Text,
@@ -21,10 +21,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { IconArrowLeft } from "@tabler/icons-react";
 import { AmountInput } from "@/components/shared/AmountInput";
+import { RefundSection } from "@/components/refunds/RefundSection";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useUiStore } from "@/stores/uiStore";
-import type { ExpenseWithRelations, UpdateExpenseInput } from "@/types";
+import { formatCurrency } from "@/lib/client-utils";
+import { sumRefundAmounts, toCents } from "@/lib/refunds";
+import type {
+  ExpenseWithRelations,
+  RefundWithRelations,
+  UpdateExpenseInput,
+} from "@/types";
 
 const recurrenceOptions = [
   { value: "NONE", label: "None" },
@@ -45,6 +52,11 @@ type ExpenseEditFormValues = {
   recurrence: "NONE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY";
 };
 
+/** GET /api/expenses/[id] nests the budget inside the envelope. */
+type ExpenseDetail = ExpenseWithRelations & {
+  envelope: ExpenseWithRelations["envelope"] & { budget: { currency: string } };
+};
+
 export default function EditExpensePage({
   params,
 }: {
@@ -53,11 +65,22 @@ export default function EditExpensePage({
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [expense, setExpense] = useState<ExpenseWithRelations | null>(null);
+  const [expense, setExpense] = useState<ExpenseDetail | null>(null);
   const [payeeOptions, setPayeeOptions] = useState<string[]>([]);
   const { updateExpense, fetchExpenses } = useExpenseStore();
   const { envelopes, fetchEnvelopes } = useEnvelopeStore();
   const { currentBudgetId } = useUiStore();
+
+  const currency = expense?.envelope?.budget?.currency;
+  const refunds = expense?.refunds ?? [];
+  const refundedTotal = sumRefundAmounts(refunds);
+
+  // Mantine captures validation rules on first render, before the expense has
+  // loaded, so the amount rule reads the refunded total through a ref.
+  const refundedTotalRef = useRef(0);
+  refundedTotalRef.current = refundedTotal;
+  const currencyRef = useRef<string | undefined>(undefined);
+  currencyRef.current = currency;
 
   const form = useForm<ExpenseEditFormValues>({
     initialValues: {
@@ -70,12 +93,26 @@ export default function EditExpensePage({
       recurrence: "NONE",
     },
     validate: {
-      amount: (value) => (value <= 0 ? "Amount must be greater than 0" : null),
+      amount: (value) => {
+        if (value <= 0) return "Amount must be greater than 0";
+        const refunded = refundedTotalRef.current;
+        if (refunded > 0 && toCents(value) < toCents(refunded)) {
+          return `Cannot be less than the ${formatCurrency(
+            refunded,
+            currencyRef.current
+          )} already refunded`;
+        }
+        return null;
+      },
       payee: (value) => (value.length < 1 ? "Payee is required" : null),
       envelopeId: (value) =>
         !value || value.length < 1 ? "Envelope is required" : null,
     },
   });
+
+  const handleRefundsChange = (next: RefundWithRelations[]) => {
+    setExpense((prev) => (prev ? { ...prev, refunds: next } : prev));
+  };
 
   useEffect(() => {
     const fetchExpense = async () => {
@@ -93,7 +130,7 @@ export default function EditExpensePage({
         }
 
         const data = await response.json();
-        const expenseData: ExpenseWithRelations = data.data;
+        const expenseData: ExpenseDetail = data.data;
         setExpense(expenseData);
 
         const budgetId = expenseData.envelope?.budgetId;
@@ -162,7 +199,9 @@ export default function EditExpensePage({
       } else {
         notifications.show({
           title: "Error",
-          message: "Failed to update expense",
+          // The store records the server's message, which explains specific
+          // rejections such as an amount below what has already been refunded.
+          message: useExpenseStore.getState().error ?? "Failed to update expense",
           color: "red",
         });
       }
@@ -229,11 +268,16 @@ export default function EditExpensePage({
               label="Amount"
               placeholder="0.00"
               required
-              min={0}
+              min={refundedTotal > 0 ? refundedTotal : 0}
               decimalScale={2}
               fixedDecimalScale
               prefix="$"
               thousandSeparator=","
+              description={
+                refundedTotal > 0
+                  ? `At least ${formatCurrency(refundedTotal, currency)} — the amount already refunded`
+                  : undefined
+              }
               {...form.getInputProps("amount")}
             />
 
@@ -289,6 +333,16 @@ export default function EditExpensePage({
           </Stack>
         </form>
       </Card>
+
+      <RefundSection
+        expenseId={expense.id}
+        grossAmount={Number(expense.amount)}
+        expenseDate={expense.date}
+        currency={currency}
+        refunds={refunds}
+        onRefundsChange={handleRefundsChange}
+        canManage
+      />
     </Stack>
   );
 }

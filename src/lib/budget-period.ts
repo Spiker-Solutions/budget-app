@@ -1,4 +1,5 @@
 import type { PeriodType } from "@prisma/client";
+import { roundMoney } from "@/lib/refunds";
 
 /**
  * Period boundaries use the JavaScript local timezone (same as DatePicker / browser),
@@ -27,6 +28,12 @@ export type ExpenseInPeriodInput = {
   envelopeId: string;
   date: Date;
   amount: number;
+  /**
+   * Combined amount of every refund against this expense. Refunds inherit the
+   * expense's date, so they always land in the same period and simply reduce
+   * that period's net spend — no separate refund date scan is needed.
+   */
+  refundedAmount?: number;
 };
 
 export type EnvelopePeriodTotals = {
@@ -34,6 +41,10 @@ export type EnvelopePeriodTotals = {
   baseAllocation: number;
   carriedFromPrior: number;
   availableThisPeriod: number;
+  /** Expense amounts before refunds. */
+  grossSpentThisPeriod: number;
+  refundedThisPeriod: number;
+  /** Net spend (gross less refunds) — what counts against the allocation. */
   spentThisPeriod: number;
   remainingThisPeriod: number;
   effectiveCarryEnabled: boolean;
@@ -46,6 +57,8 @@ export type BudgetPeriodTotals = {
   totalBaseAllocation: number;
   totalCarriedFromPrior: number;
   totalAvailableThisPeriod: number;
+  totalGrossSpentThisPeriod: number;
+  totalRefundedThisPeriod: number;
   totalSpentThisPeriod: number;
   totalRemainingThisPeriod: number;
 };
@@ -190,19 +203,50 @@ export function getPreviousPeriod(
   return prev;
 }
 
+function reduceInRange(
+  expenses: ExpenseInPeriodInput[],
+  range: PeriodBounds,
+  envelopeId: string | undefined,
+  valueOf: (expense: ExpenseInPeriodInput) => number
+): number {
+  const total = expenses.reduce((sum, e) => {
+    if (envelopeId !== undefined && e.envelopeId !== envelopeId) return sum;
+    if (!isExpenseInRange(e, range)) return sum;
+    return sum + valueOf(e);
+  }, 0);
+  // Amounts are DECIMAL(12,2); rounding to cents keeps float drift from
+  // rendering a fully refunded period as a few billionths over or under.
+  return roundMoney(total);
+}
+
+/** Expense amounts in the range, before any refunds. */
+export function sumGrossExpensesInRange(
+  expenses: ExpenseInPeriodInput[],
+  range: PeriodBounds,
+  envelopeId?: string
+): number {
+  return reduceInRange(expenses, range, envelopeId, (e) => e.amount);
+}
+
+/** Amount refunded against expenses in the range. */
+export function sumRefundsInRange(
+  expenses: ExpenseInPeriodInput[],
+  range: PeriodBounds,
+  envelopeId?: string
+): number {
+  return reduceInRange(expenses, range, envelopeId, (e) => e.refundedAmount ?? 0);
+}
+
+/**
+ * Net spend for the range: expense amounts less refunds. This is the figure
+ * every spent/remaining/progress display and the carry-over calculation use.
+ */
 export function sumExpensesInRange(
   expenses: ExpenseInPeriodInput[],
   range: PeriodBounds,
   envelopeId?: string
 ): number {
-  return expenses.reduce((sum, e) => {
-    if (envelopeId !== undefined && e.envelopeId !== envelopeId) return sum;
-    const t = e.date.getTime();
-    if (t >= range.start.getTime() && t <= range.end.getTime()) {
-      return sum + e.amount;
-    }
-    return sum;
-  }, 0);
+  return reduceInRange(expenses, range, envelopeId, (e) => e.amount - (e.refundedAmount ?? 0));
 }
 
 export function isExpenseInRange(expense: ExpenseInPeriodInput, range: PeriodBounds): boolean {
@@ -345,37 +389,40 @@ export function computeCarryAndPeriodTotals(
     let carriedFromPrior = 0;
     if (applyCarry && carryEnabled && previousPeriod) {
       const spentPrior = sumExpensesInRange(expenses, previousPeriod, env.id);
-      carriedFromPrior = Math.max(0, baseAllocation - spentPrior);
+      carriedFromPrior = Math.max(0, roundMoney(baseAllocation - spentPrior));
     }
     const availableThisPeriod = baseAllocation + carriedFromPrior;
+    const grossSpentThisPeriod = sumGrossExpensesInRange(expenses, currentPeriod, env.id);
+    const refundedThisPeriod = sumRefundsInRange(expenses, currentPeriod, env.id);
     const spentThisPeriod = sumExpensesInRange(expenses, currentPeriod, env.id);
-    const remainingThisPeriod = availableThisPeriod - spentThisPeriod;
+    const remainingThisPeriod = roundMoney(availableThisPeriod - spentThisPeriod);
 
     return {
       envelopeId: env.id,
       baseAllocation,
       carriedFromPrior,
       availableThisPeriod,
+      grossSpentThisPeriod,
+      refundedThisPeriod,
       spentThisPeriod,
       remainingThisPeriod,
       effectiveCarryEnabled: carryEnabled,
     };
   });
 
-  const totalBaseAllocation = envelopeTotals.reduce((s, e) => s + e.baseAllocation, 0);
-  const totalCarriedFromPrior = envelopeTotals.reduce((s, e) => s + e.carriedFromPrior, 0);
-  const totalAvailableThisPeriod = envelopeTotals.reduce((s, e) => s + e.availableThisPeriod, 0);
-  const totalSpentThisPeriod = envelopeTotals.reduce((s, e) => s + e.spentThisPeriod, 0);
-  const totalRemainingThisPeriod = envelopeTotals.reduce((s, e) => s + e.remainingThisPeriod, 0);
+  const sumBy = (pick: (totals: EnvelopePeriodTotals) => number) =>
+    roundMoney(envelopeTotals.reduce((sum, e) => sum + pick(e), 0));
 
   return {
     currentPeriod,
     previousPeriod,
     envelopeTotals,
-    totalBaseAllocation,
-    totalCarriedFromPrior,
-    totalAvailableThisPeriod,
-    totalSpentThisPeriod,
-    totalRemainingThisPeriod,
+    totalBaseAllocation: sumBy((e) => e.baseAllocation),
+    totalCarriedFromPrior: sumBy((e) => e.carriedFromPrior),
+    totalAvailableThisPeriod: sumBy((e) => e.availableThisPeriod),
+    totalGrossSpentThisPeriod: sumBy((e) => e.grossSpentThisPeriod),
+    totalRefundedThisPeriod: sumBy((e) => e.refundedThisPeriod),
+    totalSpentThisPeriod: sumBy((e) => e.spentThisPeriod),
+    totalRemainingThisPeriod: sumBy((e) => e.remainingThisPeriod),
   };
 }

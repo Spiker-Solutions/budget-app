@@ -3,6 +3,7 @@ import type {
   Budget,
   Envelope,
   Expense,
+  Refund,
   Payee,
   BudgetUser,
   EnvelopeUser,
@@ -11,7 +12,7 @@ import type {
   RecurrenceType,
 } from "@prisma/client";
 
-export type { User, Budget, Envelope, Expense, Payee, BudgetUser, EnvelopeUser };
+export type { User, Budget, Envelope, Expense, Refund, Payee, BudgetUser, EnvelopeUser };
 export { Role, PeriodType, RecurrenceType };
 
 export type BudgetWithRelations = Budget & {
@@ -33,10 +34,15 @@ export type EnvelopeWithRelations = Envelope & {
   };
 };
 
+export type RefundWithRelations = Refund & {
+  createdBy: Pick<User, "id" | "name" | "email" | "image">;
+};
+
 export type ExpenseWithRelations = Expense & {
   payee: Payee;
   envelope: Envelope;
   createdBy: Pick<User, "id" | "name" | "email" | "image">;
+  refunds: RefundWithRelations[];
 };
 
 export interface CreateBudgetInput {
@@ -106,6 +112,17 @@ export interface UpdateExpenseInput {
   budgetId?: string;
   isRecurring?: boolean;
   recurrence?: "NONE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY";
+}
+
+/** A refund's date is always inherited from its expense, so it is never sent by the client. */
+export interface CreateRefundInput {
+  amount: number;
+  description?: string;
+}
+
+export interface UpdateRefundInput {
+  amount?: number;
+  description?: string;
 }
 
 export interface CreatePayeeInput {

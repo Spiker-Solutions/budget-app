@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { createExpenseSchema } from "@/lib/validations";
+import { expenseInclude } from "@/lib/expense-queries";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -85,18 +86,7 @@ export async function GET(req: NextRequest) {
 
     const expenses = await prisma.expense.findMany({
       where: whereClause,
-      include: {
-        payee: true,
-        envelope: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
-        },
-      },
+      include: expenseInclude,
       orderBy: {
         date: "desc",
       },
@@ -184,18 +174,7 @@ export async function POST(req: NextRequest) {
         envelopeId,
         createdById: session.user.id,
       },
-      include: {
-        payee: true,
-        envelope: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
-        },
-      },
+      include: expenseInclude,
     });
 
     return NextResponse.json(successResponse(expense), { status: 201 });

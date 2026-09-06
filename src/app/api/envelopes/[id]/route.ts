@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { updateEnvelopeSchema } from "@/lib/validations";
 import { canManageEnvelope } from "@/lib/permissions";
+import { refundsForExpense, userSummarySelect } from "@/lib/expense-queries";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -76,14 +77,8 @@ export async function GET(
         expenses: {
           include: {
             payee: true,
-            createdBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-              },
-            },
+            createdBy: { select: userSummarySelect },
+            refunds: refundsForExpense,
           },
           orderBy: { date: "desc" },
         },

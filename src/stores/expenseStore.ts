@@ -1,5 +1,17 @@
 import { create } from "zustand";
-import type { ExpenseWithRelations, CreateExpenseInput, UpdateExpenseInput, Payee } from "@/types";
+import type {
+  ExpenseWithRelations,
+  CreateExpenseInput,
+  UpdateExpenseInput,
+  CreateRefundInput,
+  UpdateRefundInput,
+  RefundWithRelations,
+  Payee,
+} from "@/types";
+
+export type RefundMutationResult =
+  | { ok: true; refund: RefundWithRelations }
+  | { ok: false; error: string };
 
 interface ExpenseState {
   expenses: ExpenseWithRelations[];
@@ -18,6 +30,27 @@ interface ExpenseState {
   updateExpense: (id: string, data: UpdateExpenseInput) => Promise<ExpenseWithRelations | null>;
   deleteExpense: (id: string) => Promise<boolean>;
   createOrGetPayee: (name: string, budgetId: string) => Promise<Payee | null>;
+
+  createRefund: (expenseId: string, data: CreateRefundInput) => Promise<RefundMutationResult>;
+  updateRefund: (
+    expenseId: string,
+    refundId: string,
+    data: UpdateRefundInput
+  ) => Promise<RefundMutationResult>;
+  deleteRefund: (expenseId: string, refundId: string) => Promise<boolean>;
+}
+
+/** Replaces one expense's refund list in place so every mounted view recomputes net totals. */
+function withRefunds(
+  expenses: ExpenseWithRelations[],
+  expenseId: string,
+  update: (refunds: RefundWithRelations[]) => RefundWithRelations[]
+): ExpenseWithRelations[] {
+  return expenses.map((expense) =>
+    expense.id === expenseId
+      ? { ...expense, refunds: update(expense.refunds ?? []) }
+      : expense
+  );
 }
 
 export const useExpenseStore = create<ExpenseState>((set, get) => ({
@@ -157,6 +190,79 @@ export const useExpenseStore = create<ExpenseState>((set, get) => ({
     } catch (error) {
       console.error("Failed to create payee:", error);
       return null;
+    }
+  },
+
+  createRefund: async (expenseId: string, data: CreateRefundInput) => {
+    try {
+      const response = await fetch(`/api/expenses/${expenseId}/refunds`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        return { ok: false as const, error: result.error };
+      }
+
+      set({
+        expenses: withRefunds(get().expenses, expenseId, (refunds) => [
+          ...refunds,
+          result.data,
+        ]),
+      });
+      return { ok: true as const, refund: result.data };
+    } catch {
+      return { ok: false as const, error: "Failed to add refund" };
+    }
+  },
+
+  updateRefund: async (expenseId: string, refundId: string, data: UpdateRefundInput) => {
+    try {
+      const response = await fetch(`/api/refunds/${refundId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        return { ok: false as const, error: result.error };
+      }
+
+      set({
+        expenses: withRefunds(get().expenses, expenseId, (refunds) =>
+          refunds.map((r) => (r.id === refundId ? result.data : r))
+        ),
+      });
+      return { ok: true as const, refund: result.data };
+    } catch {
+      return { ok: false as const, error: "Failed to update refund" };
+    }
+  },
+
+  deleteRefund: async (expenseId: string, refundId: string) => {
+    try {
+      const response = await fetch(`/api/refunds/${refundId}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        set({ error: result.error });
+        return false;
+      }
+
+      set({
+        expenses: withRefunds(get().expenses, expenseId, (refunds) =>
+          refunds.filter((r) => r.id !== refundId)
+        ),
+      });
+      return true;
+    } catch {
+      set({ error: "Failed to delete refund" });
+      return false;
     }
   },
 }));
