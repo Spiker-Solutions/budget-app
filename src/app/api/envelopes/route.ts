@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { createEnvelopeSchema } from "@/lib/validations";
 import { canManageBudget } from "@/lib/permissions";
+import { activeOnly, isArchived } from "@/lib/archive";
 
 async function checkBudgetAccess(budgetId: string, userId: string) {
   const membership = await prisma.budgetUser.findUnique({
@@ -43,8 +44,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
     }
 
+    const budget = await prisma.budget.findUnique({
+      where: { id: budgetId, ...activeOnly },
+      select: { id: true },
+    });
+
+    if (!budget) {
+      return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
+    }
+
     const envelopes = await prisma.envelope.findMany({
-      where: { budgetId },
+      where: { budgetId, ...activeOnly },
       include: {
         budget: true,
         members: {
@@ -106,6 +116,15 @@ export async function POST(req: NextRequest) {
     const membership = await checkBudgetAccess(budgetId, session.user.id);
 
     if (!membership) {
+      return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
+    }
+
+    const budget = await prisma.budget.findUnique({
+      where: { id: budgetId },
+      select: { archivedAt: true },
+    });
+
+    if (!budget || isArchived(budget.archivedAt)) {
       return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
     }
 

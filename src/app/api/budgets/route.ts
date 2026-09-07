@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { createBudgetSchema } from "@/lib/validations";
+import { activeOnly } from "@/lib/archive";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -15,6 +16,7 @@ export async function GET() {
   try {
     const budgets = await prisma.budget.findMany({
       where: {
+        ...activeOnly,
         members: {
           some: {
             userId: session.user.id,
@@ -34,11 +36,13 @@ export async function GET() {
             },
           },
         },
-        envelopes: true,
+        envelopes: {
+          where: activeOnly,
+        },
         payees: true,
         _count: {
           select: {
-            envelopes: true,
+            envelopes: { where: activeOnly },
             members: true,
           },
         },

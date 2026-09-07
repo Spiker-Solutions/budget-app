@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { updateEnvelopeSchema } from "@/lib/validations";
 import { canManageEnvelope } from "@/lib/permissions";
+import { activeOnly, isArchived, removeEnvelope } from "@/lib/archive";
 import { refundsForExpense, userSummarySelect } from "@/lib/expense-queries";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
@@ -25,6 +26,7 @@ async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   });
 
   if (!envelope) return null;
+  if (isArchived(envelope.archivedAt) || isArchived(envelope.budget.archivedAt)) return null;
 
   const budgetMembership = envelope.budget.members[0];
   const envelopeMembership = envelope.members[0];
@@ -59,7 +61,7 @@ export async function GET(
     }
 
     const envelope = await prisma.envelope.findUnique({
-      where: { id },
+      where: { id, ...activeOnly },
       include: {
         budget: true,
         members: {
@@ -87,6 +89,10 @@ export async function GET(
         },
       },
     });
+
+    if (!envelope) {
+      return NextResponse.json(errorResponse("Envelope not found"), { status: 404 });
+    }
 
     return NextResponse.json(successResponse(envelope));
   } catch (error) {
@@ -191,11 +197,11 @@ export async function DELETE(
       );
     }
 
-    await prisma.envelope.delete({
-      where: { id },
-    });
+    const result = await removeEnvelope(id);
 
-    return NextResponse.json(successResponse({ deleted: true }));
+    return NextResponse.json(
+      successResponse({ deleted: true, archived: result.archived })
+    );
   } catch (error) {
     console.error("Error deleting envelope:", error);
     return NextResponse.json(

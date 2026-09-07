@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { createExpenseSchema } from "@/lib/validations";
 import { expenseInclude } from "@/lib/expense-queries";
+import { activeOnly, isArchived } from "@/lib/archive";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -24,6 +25,7 @@ async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   });
 
   if (!envelope) return null;
+  if (isArchived(envelope.archivedAt) || isArchived(envelope.budget.archivedAt)) return null;
 
   const budgetMembership = envelope.budget.members[0];
   const envelopeMembership = envelope.members[0];
@@ -68,12 +70,16 @@ export async function GET(req: NextRequest) {
       whereClause = {
         envelope: {
           budgetId,
+          ...activeOnly,
+          budget: activeOnly,
         },
       };
     } else {
       whereClause = {
         envelope: {
+          ...activeOnly,
           budget: {
+            ...activeOnly,
             members: {
               some: {
                 userId: session.user.id,
@@ -132,6 +138,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (!membership) {
+      return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
+    }
+
+    const budget = await prisma.budget.findUnique({
+      where: { id: budgetId },
+      select: { archivedAt: true },
+    });
+
+    if (!budget || isArchived(budget.archivedAt)) {
       return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
     }
 

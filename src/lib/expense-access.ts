@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { canManageEnvelope } from "@/lib/permissions";
+import { isArchived } from "@/lib/archive";
 
 /**
  * Membership + authorization for a single expense.
@@ -31,6 +32,12 @@ export async function checkExpenseAccess(expenseId: string, userId: string) {
   });
 
   if (!expense) return null;
+  if (
+    isArchived(expense.envelope.archivedAt) ||
+    isArchived(expense.envelope.budget.archivedAt)
+  ) {
+    return null;
+  }
 
   const budgetMembership = expense.envelope.budget.members[0];
   const envelopeMembership = expense.envelope.members[0];

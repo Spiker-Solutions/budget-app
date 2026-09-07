@@ -13,12 +13,14 @@ import {
   Skeleton,
   Select,
   SegmentedControl,
+  Modal,
+  Alert,
 } from "@mantine/core";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconTrash } from "@tabler/icons-react";
 import Link from "next/link";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
 import { useBudgetStore } from "@/stores/budgetStore";
@@ -48,7 +50,10 @@ export default function EditEnvelopePage({
   const [envelope, setEnvelope] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { updateEnvelope, fetchEnvelopes } = useEnvelopeStore();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const { updateEnvelope, fetchEnvelopes, deleteEnvelope } = useEnvelopeStore();
   const { budgets } = useBudgetStore();
 
   const form = useForm<EnvelopeEditFormValues>({
@@ -122,6 +127,44 @@ export default function EditEnvelopePage({
 
     fetchEnvelope();
   }, [params.id, router, budgets, session?.user?.id]);
+
+  const handleDeleteEnvelope = async () => {
+    if (!envelope) return;
+
+    setDeleteLoading(true);
+
+    try {
+      const success = await deleteEnvelope(params.id);
+
+      if (success) {
+        if (envelope.budgetId) {
+          await fetchEnvelopes(envelope.budgetId);
+        }
+        notifications.show({
+          title: "Envelope deleted",
+          message: `"${envelope.name}" has been removed from your account`,
+          color: "green",
+        });
+        setDeleteModalOpen(false);
+        setDeleteConfirmName("");
+        router.replace("/dashboard");
+      } else {
+        notifications.show({
+          title: "Error",
+          message: "Failed to delete envelope",
+          color: "red",
+        });
+      }
+    } catch {
+      notifications.show({
+        title: "Error",
+        message: "An unexpected error occurred",
+        color: "red",
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const handleSubmit = async (values: EnvelopeEditFormValues) => {
     setSaving(true);
@@ -297,6 +340,70 @@ export default function EditEnvelopePage({
           </Stack>
         </form>
       </Card>
+
+      <Card withBorder maw={600} style={{ borderColor: "var(--mantine-color-red-4)" }}>
+        <Stack>
+          <Title order={4} c="red">
+            Danger Zone
+          </Title>
+          <Text size="sm" c="dimmed">
+            Delete this envelope and remove it and all associated expenses from your account.
+          </Text>
+          <Group>
+            <Button
+              color="red"
+              variant="outline"
+              leftSection={<IconTrash size={18} />}
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              Delete Envelope
+            </Button>
+          </Group>
+        </Stack>
+      </Card>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setDeleteConfirmName("");
+        }}
+        title="Delete Envelope"
+      >
+        <Stack>
+          <Alert color="red" variant="light">
+            This will delete <strong>{envelope.name}</strong> and remove it and all of its expenses
+            from your account.
+          </Alert>
+
+          <TextInput
+            label={`Type "${envelope.name}" to confirm`}
+            placeholder={envelope.name}
+            value={deleteConfirmName}
+            onChange={(e) => setDeleteConfirmName(e.currentTarget.value)}
+          />
+
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="subtle"
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setDeleteConfirmName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              loading={deleteLoading}
+              disabled={deleteConfirmName !== envelope.name}
+              onClick={handleDeleteEnvelope}
+            >
+              Delete Envelope
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }
