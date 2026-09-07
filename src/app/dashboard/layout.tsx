@@ -40,7 +40,7 @@ function DashboardLayoutContent({
 }) {
   const { status } = useSession();
   const router = useRouter();
-  const [opened, { toggle }] = useDisclosure();
+  const [opened, { toggle, close }] = useDisclosure();
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
 
   const { budgets, fetchBudgets, isLoading: budgetsLoading } = useBudgetStore();
@@ -145,6 +145,7 @@ function DashboardLayoutContent({
                 variant="light"
                 size="lg"
                 title="Create new budget"
+                onClick={close}
               >
                 <IconPlus size={18} />
               </ActionIcon>
@@ -158,6 +159,7 @@ function DashboardLayoutContent({
             href="/dashboard"
             label="Dashboard"
             leftSection={<IconHome size={20} />}
+            onClick={close}
           />
 
           <NavLink
@@ -165,6 +167,7 @@ function DashboardLayoutContent({
             href="/dashboard/expenses"
             label="Expenses"
             leftSection={<IconCreditCard size={20} />}
+            onClick={close}
           />
 
           <NavLink
@@ -172,6 +175,7 @@ function DashboardLayoutContent({
             href="/dashboard/settings"
             label="Settings"
             leftSection={<IconSettings size={20} />}
+            onClick={close}
           />
 
           <Divider />

@@ -201,7 +201,15 @@ export function RefundSection({
             </Table.Thead>
             <Table.Tbody>
               {refunds.map((refund) => (
-                <Table.Tr key={refund.id}>
+                <Table.Tr
+                  key={refund.id}
+                  style={canManage ? { cursor: "pointer" } : undefined}
+                  onClick={
+                    canManage
+                      ? () => openEdit(refund)
+                      : undefined
+                  }
+                >
                   <Table.Td style={{ textAlign: "right" }}>
                     <Text fw={500}>
                       {formatCurrency(Number(refund.amount), currency)}
@@ -220,7 +228,7 @@ export function RefundSection({
                     )}
                   </Table.Td>
                   {canManage && (
-                    <Table.Td>
+                    <Table.Td onClick={(event) => event.stopPropagation()}>
                       <Menu position="bottom-end" withinPortal>
                         <Menu.Target>
                           <ActionIcon variant="subtle" color="gray">
