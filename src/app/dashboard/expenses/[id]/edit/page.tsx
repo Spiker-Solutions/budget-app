@@ -170,6 +170,18 @@ export default function EditExpensePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id, router]);
 
+  useEffect(() => {
+    if (loading || window.location.hash !== "#refunds") return;
+
+    const scrollToRefunds = () => {
+      document.getElementById("refunds")?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    // Wait for layout after the expense and refund section have rendered.
+    const frame = window.requestAnimationFrame(scrollToRefunds);
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading]);
+
   const handleSubmit = async (values: ExpenseEditFormValues) => {
     setSaving(true);
 
