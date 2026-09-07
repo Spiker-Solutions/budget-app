@@ -427,6 +427,67 @@ async function main() {
     expenseCount++;
   }
 
+  console.log("Creating refunded expenses...");
+  let refundCount = 0;
+
+  const returnsPayeeId = payeeByName.get("Amazon");
+  const returnsEnvelopeId = envelopeByName.get("Miscellaneous");
+
+  if (returnsPayeeId && returnsEnvelopeId) {
+    // A partially refunded expense: $120 order with one $45 item returned.
+    const partiallyRefunded = await prisma.expense.create({
+      data: {
+        amount: 120,
+        description: "Order with one item returned",
+        date: daysAgo(6),
+        payeeId: returnsPayeeId,
+        envelopeId: returnsEnvelopeId,
+        createdById: primaryUser.id,
+      },
+    });
+    expenseCount++;
+
+    await prisma.refund.create({
+      data: {
+        amount: 45,
+        description: "Returned the jacket — wrong size",
+        // Refunds always inherit the expense date.
+        date: partiallyRefunded.date,
+        expenseId: partiallyRefunded.id,
+        createdById: primaryUser.id,
+      },
+    });
+    refundCount++;
+
+    // A fully refunded expense, reached through two separate refunds.
+    const fullyRefunded = await prisma.expense.create({
+      data: {
+        amount: 90,
+        description: "Cancelled order, refunded in two parts",
+        date: daysAgo(4),
+        payeeId: returnsPayeeId,
+        envelopeId: returnsEnvelopeId,
+        createdById: primaryUser.id,
+      },
+    });
+    expenseCount++;
+
+    for (const refund of [
+      { amount: 50, description: "Headphones returned to store" },
+      { amount: 40, description: "Remaining items refunded to card" },
+    ]) {
+      await prisma.refund.create({
+        data: {
+          ...refund,
+          date: fullyRefunded.date,
+          expenseId: fullyRefunded.id,
+          createdById: partnerUser.id,
+        },
+      });
+      refundCount++;
+    }
+  }
+
   console.log("");
   console.log("Mock data created successfully!");
   console.log("");
@@ -435,6 +496,9 @@ async function main() {
   console.log(`    • ${vacationBudget.name} ($600/biweekly, 1 envelope)`);
   console.log("");
   console.log(`  Expenses: ${expenseCount} transactions over the last ~4 months`);
+  console.log(
+    `  Refunds: ${refundCount} across 2 expenses (one partial, one fully refunded in two parts)`
+  );
   console.log("");
   console.log("  Extra test accounts (password: password123):");
   console.log("    • partner@test.com  — ADMIN on household budget");

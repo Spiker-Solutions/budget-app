@@ -75,6 +75,9 @@ export default function DashboardPage() {
   const totalAvailableThisPeriod = periodTotals?.totalAvailableThisPeriod ?? 0;
   const totalCarriedFromPrior = periodTotals?.totalCarriedFromPrior ?? 0;
   const totalSpentThisPeriod = periodTotals?.totalSpentThisPeriod ?? 0;
+  const totalGrossSpentThisPeriod =
+    periodTotals?.totalGrossSpentThisPeriod ?? totalSpentThisPeriod;
+  const totalRefundedThisPeriod = periodTotals?.totalRefundedThisPeriod ?? 0;
   const totalRemainingThisPeriod = periodTotals?.totalRemainingThisPeriod ?? 0;
   const spentPercentage =
     totalAvailableThisPeriod > 0
@@ -196,6 +199,12 @@ export default function DashboardPage() {
           >
             {formatCurrency(totalSpentThisPeriod, currentBudget.currency)}
           </Text>
+          {totalRefundedThisPeriod > 0 && (
+            <Text size="xs" c="dimmed">
+              {formatCurrency(totalGrossSpentThisPeriod, currentBudget.currency)} less{" "}
+              {formatCurrency(totalRefundedThisPeriod, currentBudget.currency)} refunded
+            </Text>
+          )}
           <Progress
             value={Math.min(spentPercentage, 100)}
             color={spentPercentage > 100 ? "red" : spentPercentage > 80 ? "yellow" : "blue"}

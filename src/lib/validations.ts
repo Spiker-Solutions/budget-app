@@ -80,6 +80,19 @@ export const createExpenseSchema = z.object({
 
 export const updateExpenseSchema = createExpenseSchema.partial();
 
+/**
+ * A refund has no `date` field: it always inherits the parent expense's date,
+ * written server-side on create and re-synced when the expense date changes.
+ * The "refunds must not exceed the expense" rule spans sibling rows, so it is
+ * enforced transactionally in the API rather than here.
+ */
+export const createRefundSchema = z.object({
+  amount: z.number().positive("Refund amount must be positive"),
+  description: z.string().max(500).optional(),
+});
+
+export const updateRefundSchema = createRefundSchema.partial();
+
 export const createPayeeSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   budgetId: z.string().min(1, "Budget ID is required"),

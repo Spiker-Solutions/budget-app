@@ -4,44 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { updateExpenseSchema } from "@/lib/validations";
-
-async function checkExpenseAccess(expenseId: string, userId: string) {
-  const expense = await prisma.expense.findUnique({
-    where: { id: expenseId },
-    include: {
-      envelope: {
-        include: {
-          budget: {
-            include: {
-              members: {
-                where: { userId },
-              },
-            },
-          },
-          members: {
-            where: { userId },
-          },
-        },
-      },
-    },
-  });
-
-  if (!expense) return null;
-
-  const budgetMembership = expense.envelope.budget.members[0];
-  const envelopeMembership = expense.envelope.members[0];
-
-  if (!budgetMembership && !envelopeMembership) return null;
-
-  const isAdmin = 
-    budgetMembership?.role === "ADMIN" || 
-    budgetMembership?.role === "OWNER" ||
-    envelopeMembership?.role === "ADMIN" ||
-    envelopeMembership?.role === "OWNER";
-  const isCreator = expense.createdById === userId;
-
-  return { expense, isAdmin, isCreator };
-}
+import { checkExpenseAccess } from "@/lib/expense-access";
+import { expenseInclude } from "@/lib/expense-queries";
+import {
+  assertExpenseAmountCoversRefunds,
+  mapRefundGuardError,
+} from "@/lib/refund-guard";
 
 export async function GET(
   req: NextRequest,
@@ -65,18 +33,10 @@ export async function GET(
     const expense = await prisma.expense.findUnique({
       where: { id },
       include: {
-        payee: true,
+        ...expenseInclude,
         envelope: {
           include: {
             budget: true,
-          },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
           },
         },
       },
@@ -103,6 +63,7 @@ export async function PATCH(
   }
 
   const { id } = await params;
+  let currency: string | undefined;
 
   try {
     const access = await checkExpenseAccess(id, session.user.id);
@@ -111,7 +72,9 @@ export async function PATCH(
       return NextResponse.json(errorResponse("Expense not found"), { status: 404 });
     }
 
-    if (!access.isAdmin && !access.isCreator) {
+    currency = access.expense.envelope.budget.currency;
+
+    if (!access.canWrite) {
       return NextResponse.json(
         errorResponse("You can only edit your own expenses"),
         { status: 403 }
@@ -157,57 +120,83 @@ export async function PATCH(
       updateData.envelopeId = envelopeId;
     }
 
-    if (date) {
-      updateData.date = new Date(date);
+    const newDate = date ? new Date(date) : null;
+    if (newDate) {
+      updateData.date = newDate;
     }
 
     if (recurrence !== undefined) {
       updateData.recurrence = recurrence === "NONE" ? null : recurrence;
     }
 
-    if (payee !== undefined) {
-      const normalizedPayeeName = payee.trim().toLowerCase();
-      let payeeRecord = await prisma.payee.findUnique({
-        where: {
-          budgetId_normalizedName: {
-            budgetId,
-            normalizedName: normalizedPayeeName,
-          },
-        },
-      });
+    // Refunds mirror the expense date, so a date change has to propagate to
+    // them or they would drift into a different budget period than the
+    // expense they offset.
+    const dateChanged =
+      newDate !== null && newDate.getTime() !== access.expense.date.getTime();
 
-      if (!payeeRecord) {
-        payeeRecord = await prisma.payee.create({
-          data: {
-            name: payee.trim(),
-            normalizedName: normalizedPayeeName,
-            budgetId,
-          },
+    const expense = await prisma.$transaction(async (tx) => {
+      if (rest.amount !== undefined) {
+        await assertExpenseAmountCoversRefunds(tx, {
+          expenseId: id,
+          newAmount: rest.amount,
         });
       }
 
-      updateData.payeeId = payeeRecord.id;
-    }
-
-    const expense = await prisma.expense.update({
-      where: { id },
-      data: updateData,
-      include: {
-        payee: true,
-        envelope: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
+      if (payee !== undefined) {
+        const normalizedPayeeName = payee.trim().toLowerCase();
+        let payeeRecord = await tx.payee.findUnique({
+          where: {
+            budgetId_normalizedName: {
+              budgetId,
+              normalizedName: normalizedPayeeName,
+            },
           },
-        },
-      },
+        });
+
+        if (!payeeRecord) {
+          payeeRecord = await tx.payee.create({
+            data: {
+              name: payee.trim(),
+              normalizedName: normalizedPayeeName,
+              budgetId,
+            },
+          });
+        }
+
+        updateData.payeeId = payeeRecord.id;
+      }
+
+      const updated = await tx.expense.update({
+        where: { id },
+        data: updateData,
+        include: expenseInclude,
+      });
+
+      if (dateChanged && newDate) {
+        await tx.refund.updateMany({
+          where: { expenseId: id },
+          data: { date: newDate },
+        });
+
+        return tx.expense.findUniqueOrThrow({
+          where: { id },
+          include: expenseInclude,
+        });
+      }
+
+      return updated;
     });
 
     return NextResponse.json(successResponse(expense));
   } catch (error) {
+    const guardError = mapRefundGuardError(error, currency);
+    if (guardError) {
+      return NextResponse.json(errorResponse(guardError.message), {
+        status: guardError.status,
+      });
+    }
+
     console.error("Error updating expense:", error);
     return NextResponse.json(
       errorResponse("Failed to update expense"),
@@ -235,7 +224,7 @@ export async function DELETE(
       return NextResponse.json(errorResponse("Expense not found"), { status: 404 });
     }
 
-    if (!access.isAdmin && !access.isCreator) {
+    if (!access.canWrite) {
       return NextResponse.json(
         errorResponse("You can only delete your own expenses"),
         { status: 403 }

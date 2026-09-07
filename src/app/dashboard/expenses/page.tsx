@@ -14,15 +14,24 @@ import {
   ActionIcon,
   Menu,
 } from "@mantine/core";
-import { IconPlus, IconDots, IconEdit, IconTrash } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconDots,
+  IconEdit,
+  IconReceiptRefund,
+  IconTrash,
+} from "@tabler/icons-react";
 import Link from "next/link";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
 import { formatCurrency } from "@/lib/client-utils";
 import { filterExpensesInRange } from "@/lib/budget-period";
+import { getRefundSummary, roundMoney } from "@/lib/refunds";
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
 import { ExpenseCreatorBadge } from "@/components/expenses/ExpenseCreatorBadge";
+import { ExpenseAmountCell } from "@/components/refunds/ExpenseAmountCell";
+import { RefundStatusBadge } from "@/components/refunds/RefundStatusBadge";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import dayjs from "dayjs";
 
@@ -64,10 +73,25 @@ export default function ExpensesPage() {
     );
   }, [expenses, periodTotals]);
 
-  const periodTotalSpent = useMemo(
-    () => periodExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
-    [periodExpenses]
-  );
+  const periodSummary = useMemo(() => {
+    const totals = periodExpenses.reduce(
+      (acc, expense) => {
+        const { grossAmount, refundedTotal, netAmount } = getRefundSummary(expense);
+        return {
+          gross: acc.gross + grossAmount,
+          refunded: acc.refunded + refundedTotal,
+          net: acc.net + netAmount,
+        };
+      },
+      { gross: 0, refunded: 0, net: 0 }
+    );
+
+    return {
+      gross: roundMoney(totals.gross),
+      refunded: roundMoney(totals.refunded),
+      net: roundMoney(totals.net),
+    };
+  }, [periodExpenses]);
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this expense?")) {
@@ -174,7 +198,12 @@ export default function ExpensesPage() {
                     {dayjs(expense.date).format("MMM D, YYYY")}
                   </Table.Td>
                   <Table.Td>
-                    <Text fw={500}>{expense.payee.name}</Text>
+                    <Group gap="xs" wrap="nowrap">
+                      <Text fw={500}>{expense.payee.name}</Text>
+                      <RefundStatusBadge
+                        status={getRefundSummary(expense).status}
+                      />
+                    </Group>
                     {expense.location && (
                       <Text size="xs" c="dimmed">
                         {expense.location}
@@ -208,12 +237,10 @@ export default function ExpensesPage() {
                     )}
                   </Table.Td>
                   <Table.Td style={{ textAlign: "right" }}>
-                    <Text fw={500}>
-                      {formatCurrency(
-                        Number(expense.amount),
-                        currentBudget.currency
-                      )}
-                    </Text>
+                    <ExpenseAmountCell
+                      expense={expense}
+                      currency={currentBudget.currency}
+                    />
                   </Table.Td>
                   <Table.Td>
                     <Menu position="bottom-end" withinPortal>
@@ -229,6 +256,13 @@ export default function ExpensesPage() {
                           href={`/dashboard/expenses/${expense.id}/edit`}
                         >
                           Edit
+                        </Menu.Item>
+                        <Menu.Item
+                          leftSection={<IconReceiptRefund size={14} />}
+                          component={Link}
+                          href={`/dashboard/expenses/${expense.id}/edit#refunds`}
+                        >
+                          Refunds
                         </Menu.Item>
                         <Menu.Item
                           leftSection={<IconTrash size={14} />}
@@ -252,10 +286,18 @@ export default function ExpensesPage() {
           {periodExpenses.length} expense{periodExpenses.length !== 1 ? "s" : ""}
           {!isCurrentPeriod && " in this period"}
         </Text>
-        <Text size="sm" fw={500}>
-          Total spent:{" "}
-          {formatCurrency(periodTotalSpent, currentBudget.currency)}
-        </Text>
+        <div style={{ textAlign: "right" }}>
+          <Text size="sm" fw={500}>
+            Total spent:{" "}
+            {formatCurrency(periodSummary.net, currentBudget.currency)}
+          </Text>
+          {periodSummary.refunded > 0 && (
+            <Text size="xs" c="dimmed">
+              {formatCurrency(periodSummary.gross, currentBudget.currency)} less{" "}
+              {formatCurrency(periodSummary.refunded, currentBudget.currency)} refunded
+            </Text>
+          )}
+        </div>
       </Group>
     </Stack>
   );

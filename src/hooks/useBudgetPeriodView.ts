@@ -13,6 +13,7 @@ import {
   type BudgetPeriodInput,
   type BudgetPeriodTotals,
 } from "@/lib/budget-period";
+import { sumRefundAmounts, type RefundAmountLike } from "@/lib/refunds";
 import type { Budget, BudgetWithRelations } from "@/types";
 
 export function toBudgetPeriodInput(budget: Budget): BudgetPeriodInput {
@@ -37,6 +38,7 @@ type ExpenseLike = {
   envelopeId: string;
   date: Date | string;
   amount: unknown;
+  refunds?: RefundAmountLike[];
 };
 
 export function useBudgetPeriodView(
@@ -86,6 +88,7 @@ export function useBudgetPeriodView(
       envelopeId: e.envelopeId,
       date: new Date(e.date),
       amount: Number(e.amount),
+      refundedAmount: sumRefundAmounts(e.refunds),
     }));
     return computeCarryAndPeriodTotals(
       budgetInput,
