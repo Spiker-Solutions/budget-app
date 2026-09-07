@@ -219,7 +219,7 @@ export default function BudgetSettingsPage() {
         setCurrentBudgetId(null);
         notifications.show({
           title: "Budget deleted",
-          message: `"${currentBudget.name}" and all its data have been permanently deleted`,
+          message: `"${currentBudget.name}" has been removed from your account`,
           color: "green",
         });
         setDeleteModalOpen(false);
@@ -479,8 +479,8 @@ export default function BudgetSettingsPage() {
             Danger Zone
           </Title>
           <Text size="sm" c="dimmed">
-            Permanently delete this budget and all associated envelopes, expenses, payees, and members.
-            This action cannot be undone.
+            Delete this budget and remove all associated envelopes, expenses, payees, and members
+            from your account.
           </Text>
           <Group>
             <Button
@@ -505,8 +505,8 @@ export default function BudgetSettingsPage() {
       >
         <Stack>
           <Alert color="red" variant="light">
-            This will permanently delete <strong>{currentBudget.name}</strong> and all of its envelopes,
-            expenses, payees, and members. This action cannot be undone.
+            This will delete <strong>{currentBudget.name}</strong> and remove it and all of its envelopes,
+            expenses, payees, and members from your account.
           </Alert>
 
           <TextInput

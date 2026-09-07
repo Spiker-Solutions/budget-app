@@ -142,7 +142,7 @@ export default function EditEnvelopePage({
         }
         notifications.show({
           title: "Envelope deleted",
-          message: `"${envelope.name}" and all its expenses have been permanently deleted`,
+          message: `"${envelope.name}" has been removed from your account`,
           color: "green",
         });
         setDeleteModalOpen(false);
@@ -347,7 +347,7 @@ export default function EditEnvelopePage({
             Danger Zone
           </Title>
           <Text size="sm" c="dimmed">
-            Permanently delete this envelope and all associated expenses. This action cannot be undone.
+            Delete this envelope and remove it and all associated expenses from your account.
           </Text>
           <Group>
             <Button
@@ -372,8 +372,8 @@ export default function EditEnvelopePage({
       >
         <Stack>
           <Alert color="red" variant="light">
-            This will permanently delete <strong>{envelope.name}</strong> and all of its expenses.
-            This action cannot be undone.
+            This will delete <strong>{envelope.name}</strong> and remove it and all of its expenses
+            from your account.
           </Alert>
 
           <TextInput
