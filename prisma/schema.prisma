@@ -78,6 +78,7 @@ model Budget {
   customDays  Int?
   startDate   DateTime?
   carryOverRemainder Boolean @default(false)
+  archivedAt  DateTime?
 
   members   BudgetUser[]
   envelopes Envelope[]
@@ -85,6 +86,8 @@ model Budget {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([archivedAt])
 }
 
 enum PeriodType {
@@ -129,6 +132,7 @@ model Envelope {
   description String?
   budgetId    String
   carryOverRemainder Boolean?
+  archivedAt  DateTime?
 
   budget   Budget         @relation(fields: [budgetId], references: [id], onDelete: Cascade)
   members  EnvelopeUser[]
@@ -136,6 +140,8 @@ model Envelope {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([archivedAt])
 }
 
 model EnvelopeUser {

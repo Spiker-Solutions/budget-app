@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { inviteMemberSchema } from "@/lib/validations";
 import { canManageEnvelope } from "@/lib/permissions";
+import { isArchived } from "@/lib/archive";
 
 async function checkEnvelopeAdmin(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -24,6 +25,9 @@ async function checkEnvelopeAdmin(envelopeId: string, userId: string) {
   });
 
   if (!envelope) return false;
+  if (isArchived(envelope.archivedAt) || isArchived(envelope.budget.archivedAt)) {
+    return false;
+  }
 
   return canManageEnvelope(
     envelope.budget.members[0]?.role,

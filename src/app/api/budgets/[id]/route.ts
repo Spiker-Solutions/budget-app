@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/utils";
 import { updateBudgetSchema } from "@/lib/validations";
 import { canManageBudget } from "@/lib/permissions";
+import { activeOnly, isArchived, removeBudget } from "@/lib/archive";
 
 async function checkBudgetAccess(budgetId: string, userId: string, requireAdmin = false) {
   const membership = await prisma.budgetUser.findUnique({
@@ -42,7 +43,7 @@ export async function GET(
     }
 
     const budget = await prisma.budget.findUnique({
-      where: { id },
+      where: { id, ...activeOnly },
       include: {
         members: {
           include: {
@@ -57,6 +58,7 @@ export async function GET(
           },
         },
         envelopes: {
+          where: activeOnly,
           include: {
             _count: {
               select: { expenses: true },
@@ -66,6 +68,10 @@ export async function GET(
         payees: true,
       },
     });
+
+    if (!budget) {
+      return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
+    }
 
     return NextResponse.json(successResponse(budget));
   } catch (error) {
@@ -93,6 +99,18 @@ export async function PATCH(
     const membership = await checkBudgetAccess(id, session.user.id, true);
 
     if (!membership) {
+      return NextResponse.json(
+        errorResponse("You don't have permission to edit this budget"),
+        { status: 403 }
+      );
+    }
+
+    const existing = await prisma.budget.findUnique({
+      where: { id },
+      select: { archivedAt: true },
+    });
+
+    if (!existing || isArchived(existing.archivedAt)) {
       return NextResponse.json(
         errorResponse("You don't have permission to edit this budget"),
         { status: 403 }
@@ -167,11 +185,23 @@ export async function DELETE(
       );
     }
 
-    await prisma.budget.delete({
+    const existing = await prisma.budget.findUnique({
       where: { id },
+      select: { archivedAt: true },
     });
 
-    return NextResponse.json(successResponse({ deleted: true }));
+    if (!existing || isArchived(existing.archivedAt)) {
+      return NextResponse.json(
+        errorResponse("You don't have permission to delete this budget"),
+        { status: 403 }
+      );
+    }
+
+    const result = await removeBudget(id);
+
+    return NextResponse.json(
+      successResponse({ deleted: true, archived: result.archived })
+    );
   } catch (error) {
     console.error("Error deleting budget:", error);
     return NextResponse.json(

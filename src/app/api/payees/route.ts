@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse, normalizePayeeName } from "@/lib/utils";
 import { createPayeeSchema } from "@/lib/validations";
+import { activeOnly, isArchived } from "@/lib/archive";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -33,6 +34,15 @@ export async function GET(req: NextRequest) {
     });
 
     if (!membership) {
+      return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
+    }
+
+    const budget = await prisma.budget.findUnique({
+      where: { id: budgetId, ...activeOnly },
+      select: { id: true },
+    });
+
+    if (!budget) {
       return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
     }
 
@@ -81,6 +91,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (!membership) {
+      return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
+    }
+
+    const budget = await prisma.budget.findUnique({
+      where: { id: budgetId },
+      select: { archivedAt: true },
+    });
+
+    if (!budget || isArchived(budget.archivedAt)) {
       return NextResponse.json(errorResponse("Budget not found"), { status: 404 });
     }
 

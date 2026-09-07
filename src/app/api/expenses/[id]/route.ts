@@ -10,6 +10,7 @@ import {
   assertExpenseAmountCoversRefunds,
   mapRefundGuardError,
 } from "@/lib/refund-guard";
+import { activeOnly, isArchived } from "@/lib/archive";
 
 export async function GET(
   req: NextRequest,
@@ -104,7 +105,7 @@ export async function PATCH(
 
     if (envelopeId && envelopeId !== access.expense.envelopeId) {
       const envelope = await prisma.envelope.findUnique({
-        where: { id: envelopeId },
+        where: { id: envelopeId, ...activeOnly },
       });
       if (!envelope || envelope.budgetId !== budgetId) {
         return NextResponse.json(
