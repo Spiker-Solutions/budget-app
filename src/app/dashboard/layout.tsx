@@ -84,6 +84,11 @@ function DashboardLayoutContent({
     label: b.name,
   }));
 
+  const handleBudgetChange = (budgetId: string | null) => {
+    selectBudget(budgetId);
+    close();
+  };
+
   return (
     <AppShell
       header={{ height: 60 }}
@@ -130,7 +135,7 @@ function DashboardLayoutContent({
                   placeholder="Select a budget"
                   data={budgetOptions}
                   value={currentBudgetId}
-                  onChange={selectBudget}
+                  onChange={handleBudgetChange}
                   allowDeselect={false}
                   style={{ flex: 1 }}
                 />

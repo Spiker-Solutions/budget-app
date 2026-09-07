@@ -13,13 +13,15 @@ import {
   Select,
   Autocomplete,
   Skeleton,
+  Modal,
+  Alert,
 } from "@mantine/core";
 import { DateField } from "@/components/shared/DateField";
 import { useForm } from "@mantine/form";
 import { notifications } from "@mantine/notifications";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconArrowLeft, IconTrash } from "@tabler/icons-react";
 import { AmountInput } from "@/components/shared/AmountInput";
 import { RefundSection } from "@/components/refunds/RefundSection";
 import { useExpenseStore } from "@/stores/expenseStore";
@@ -65,9 +67,11 @@ export default function EditExpensePage({
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [expense, setExpense] = useState<ExpenseDetail | null>(null);
   const [payeeOptions, setPayeeOptions] = useState<string[]>([]);
-  const { updateExpense, fetchExpenses } = useExpenseStore();
+  const { updateExpense, fetchExpenses, deleteExpense } = useExpenseStore();
   const { envelopes, fetchEnvelopes } = useEnvelopeStore();
   const { currentBudgetId } = useUiStore();
 
@@ -181,6 +185,43 @@ export default function EditExpensePage({
     const frame = window.requestAnimationFrame(scrollToRefunds);
     return () => window.cancelAnimationFrame(frame);
   }, [loading]);
+
+  const handleDeleteExpense = async () => {
+    if (!expense) return;
+
+    setDeleteLoading(true);
+
+    try {
+      const success = await deleteExpense(params.id);
+
+      if (success) {
+        if (currentBudgetId) {
+          await fetchExpenses(undefined, currentBudgetId);
+        }
+        notifications.show({
+          title: "Expense deleted",
+          message: `Expense at "${expense.payee?.name ?? "Unknown payee"}" has been removed`,
+          color: "green",
+        });
+        setDeleteModalOpen(false);
+        router.push("/dashboard/expenses");
+      } else {
+        notifications.show({
+          title: "Error",
+          message: useExpenseStore.getState().error ?? "Failed to delete expense",
+          color: "red",
+        });
+      }
+    } catch {
+      notifications.show({
+        title: "Error",
+        message: "An unexpected error occurred",
+        color: "red",
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const handleSubmit = async (values: ExpenseEditFormValues) => {
     setSaving(true);
@@ -359,6 +400,49 @@ export default function EditExpensePage({
         onRefundsChange={handleRefundsChange}
         canManage
       />
+
+      <Card withBorder maw={600} style={{ borderColor: "var(--mantine-color-red-4)" }}>
+        <Stack>
+          <Title order={4} c="red">
+            Danger Zone
+          </Title>
+          <Text size="sm" c="dimmed">
+            Permanently delete this expense and any associated refunds from your account.
+          </Text>
+          <Group>
+            <Button
+              color="red"
+              variant="outline"
+              leftSection={<IconTrash size={18} />}
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              Delete Expense
+            </Button>
+          </Group>
+        </Stack>
+      </Card>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Delete Expense"
+      >
+        <Stack>
+          <Alert color="red" variant="light">
+            Are you sure you want to delete the expense at{" "}
+            <strong>{expense.payee?.name ?? "this payee"}</strong>? This action cannot be undone.
+          </Alert>
+
+          <Group justify="flex-end" mt="md">
+            <Button variant="subtle" onClick={() => setDeleteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button color="red" loading={deleteLoading} onClick={handleDeleteExpense}>
+              Delete Expense
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }
