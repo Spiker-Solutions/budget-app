@@ -17,6 +17,7 @@ import {
   ActionIcon,
   Modal,
   Switch,
+  Alert,
 } from "@mantine/core";
 import { DateField } from "@/components/shared/DateField";
 import { useForm } from "@mantine/form";
@@ -65,8 +66,11 @@ export default function BudgetSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteLoading, setInviteLoading] = useState(false);
-  const { budgets, updateBudget, fetchBudgets, isLoading: budgetsLoading } = useBudgetStore();
-  const { currentBudgetId } = useUiStore();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const { budgets, updateBudget, fetchBudgets, deleteBudget, isLoading: budgetsLoading } = useBudgetStore();
+  const { currentBudgetId, setCurrentBudgetId } = useUiStore();
 
   const currentBudget = budgets.find((b) => b.id === currentBudgetId);
   const userRole = getMembershipRole(currentBudget?.members, session?.user?.id);
@@ -200,6 +204,42 @@ export default function BudgetSettingsPage() {
       });
     } finally {
       setInviteLoading(false);
+    }
+  };
+
+  const handleDeleteBudget = async () => {
+    if (!currentBudgetId || !currentBudget) return;
+
+    setDeleteLoading(true);
+
+    try {
+      const success = await deleteBudget(currentBudgetId);
+
+      if (success) {
+        setCurrentBudgetId(null);
+        notifications.show({
+          title: "Budget deleted",
+          message: `"${currentBudget.name}" and all its data have been permanently deleted`,
+          color: "green",
+        });
+        setDeleteModalOpen(false);
+        setDeleteConfirmName("");
+        router.replace("/dashboard");
+      } else {
+        notifications.show({
+          title: "Error",
+          message: "Failed to delete budget",
+          color: "red",
+        });
+      }
+    } catch {
+      notifications.show({
+        title: "Error",
+        message: "An unexpected error occurred",
+        color: "red",
+      });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -432,6 +472,71 @@ export default function BudgetSettingsPage() {
           </Table>
         </Stack>
       </Card>
+
+      <Card withBorder style={{ borderColor: "var(--mantine-color-red-4)" }}>
+        <Stack>
+          <Title order={4} c="red">
+            Danger Zone
+          </Title>
+          <Text size="sm" c="dimmed">
+            Permanently delete this budget and all associated envelopes, expenses, payees, and members.
+            This action cannot be undone.
+          </Text>
+          <Group>
+            <Button
+              color="red"
+              variant="outline"
+              leftSection={<IconTrash size={18} />}
+              onClick={() => setDeleteModalOpen(true)}
+            >
+              Delete Budget
+            </Button>
+          </Group>
+        </Stack>
+      </Card>
+
+      <Modal
+        opened={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setDeleteConfirmName("");
+        }}
+        title="Delete Budget"
+      >
+        <Stack>
+          <Alert color="red" variant="light">
+            This will permanently delete <strong>{currentBudget.name}</strong> and all of its envelopes,
+            expenses, payees, and members. This action cannot be undone.
+          </Alert>
+
+          <TextInput
+            label={`Type "${currentBudget.name}" to confirm`}
+            placeholder={currentBudget.name}
+            value={deleteConfirmName}
+            onChange={(e) => setDeleteConfirmName(e.currentTarget.value)}
+          />
+
+          <Group justify="flex-end" mt="md">
+            <Button
+              variant="subtle"
+              onClick={() => {
+                setDeleteModalOpen(false);
+                setDeleteConfirmName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              loading={deleteLoading}
+              disabled={deleteConfirmName !== currentBudget.name}
+              onClick={handleDeleteBudget}
+            >
+              Delete Budget
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={inviteModalOpen}
