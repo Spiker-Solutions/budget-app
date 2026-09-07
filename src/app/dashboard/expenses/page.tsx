@@ -9,18 +9,9 @@ import {
   Group,
   Button,
   Table,
-  Badge,
   Skeleton,
-  ActionIcon,
-  Menu,
 } from "@mantine/core";
-import {
-  IconPlus,
-  IconDots,
-  IconEdit,
-  IconReceiptRefund,
-  IconTrash,
-} from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import Link from "next/link";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
@@ -29,11 +20,7 @@ import { filterExpensesInRange } from "@/lib/budget-period";
 import { getRefundSummary, roundMoney } from "@/lib/refunds";
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
-import { ExpenseCreatorBadge } from "@/components/expenses/ExpenseCreatorBadge";
-import { ExpenseAmountCell } from "@/components/refunds/ExpenseAmountCell";
-import { RefundStatusBadge } from "@/components/refunds/RefundStatusBadge";
-import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
-import dayjs from "dayjs";
+import { ExpenseListRow } from "@/components/expenses/ExpenseListRow";
 
 export default function ExpensesPage() {
   const { expenses, fetchExpenses, deleteExpense, isLoading } = useExpenseStore();
@@ -179,105 +166,32 @@ export default function ExpensesPage() {
         </Card>
       ) : (
         <Card withBorder p={0}>
-          <Table highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Date</Table.Th>
-                <Table.Th>Payee</Table.Th>
-                <Table.Th>Envelope</Table.Th>
-                <Table.Th>Description</Table.Th>
-                <Table.Th>Added by</Table.Th>
-                <Table.Th style={{ textAlign: "right" }}>Amount</Table.Th>
-                <Table.Th style={{ width: "50px" }}></Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {periodExpenses.map((expense) => (
-                <Table.Tr key={expense.id}>
-                  <Table.Td>
-                    {dayjs(expense.date).format("MMM D, YYYY")}
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" wrap="nowrap">
-                      <Text fw={500}>{expense.payee.name}</Text>
-                      <RefundStatusBadge
-                        status={getRefundSummary(expense).status}
-                      />
-                    </Group>
-                    {expense.location && (
-                      <Text size="xs" c="dimmed">
-                        {expense.location}
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    {expense.envelope ? (
-                      <Group gap="xs" wrap="nowrap">
-                        <EnvelopeIcon icon={expense.envelope.icon} color={expense.envelope.color} size={16} />
-                        <Badge variant="light">{expense.envelope.name}</Badge>
-                      </Group>
-                    ) : (
-                      <Text c="dimmed" size="sm">
-                        Unassigned
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" lineClamp={1}>
-                      {expense.description || "-"}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    {expense.createdBy ? (
-                      <ExpenseCreatorBadge user={expense.createdBy} />
-                    ) : (
-                      <Text c="dimmed" size="sm">
-                        -
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td style={{ textAlign: "right" }}>
-                    <ExpenseAmountCell
-                      expense={expense}
-                      currency={currentBudget.currency}
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <Menu position="bottom-end" withinPortal>
-                      <Menu.Target>
-                        <ActionIcon variant="subtle" color="gray">
-                          <IconDots size={16} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item
-                          leftSection={<IconEdit size={14} />}
-                          component={Link}
-                          href={`/dashboard/expenses/${expense.id}/edit`}
-                        >
-                          Edit
-                        </Menu.Item>
-                        <Menu.Item
-                          leftSection={<IconReceiptRefund size={14} />}
-                          component={Link}
-                          href={`/dashboard/expenses/${expense.id}/edit#refunds`}
-                        >
-                          Refunds
-                        </Menu.Item>
-                        <Menu.Item
-                          leftSection={<IconTrash size={14} />}
-                          color="red"
-                          onClick={() => handleDelete(expense.id)}
-                        >
-                          Delete
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Table.Td>
+          <Table.ScrollContainer minWidth={900}>
+            <Table highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Date</Table.Th>
+                  <Table.Th>Payee</Table.Th>
+                  <Table.Th>Envelope</Table.Th>
+                  <Table.Th>Description</Table.Th>
+                  <Table.Th>Added by</Table.Th>
+                  <Table.Th style={{ textAlign: "right" }}>Amount</Table.Th>
+                  <Table.Th style={{ width: "50px" }}></Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {periodExpenses.map((expense) => (
+                  <ExpenseListRow
+                    key={expense.id}
+                    expense={expense}
+                    currency={currentBudget.currency}
+                    showEnvelope
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </Card>
       )}
 

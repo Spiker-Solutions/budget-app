@@ -13,7 +13,6 @@ import {
   Table,
   Skeleton,
   ActionIcon,
-  Menu,
   Modal,
   TextInput,
   Select,
@@ -23,8 +22,6 @@ import {
   IconArrowLeft,
   IconEdit,
   IconPlus,
-  IconDots,
-  IconReceiptRefund,
   IconTrash,
   IconUserPlus,
 } from "@tabler/icons-react";
@@ -39,10 +36,8 @@ import { useBudgetStore } from "@/stores/budgetStore";
 import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
 import { computeCarryAndPeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
-import { getRefundSummary, sumRefundAmounts } from "@/lib/refunds";
-import { ExpenseCreatorBadge } from "@/components/expenses/ExpenseCreatorBadge";
-import { ExpenseAmountCell } from "@/components/refunds/ExpenseAmountCell";
-import { RefundStatusBadge } from "@/components/refunds/RefundStatusBadge";
+import { sumRefundAmounts } from "@/lib/refunds";
+import { ExpenseListRow } from "@/components/expenses/ExpenseListRow";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import dayjs from "dayjs";
 
@@ -472,87 +467,30 @@ export default function EnvelopeDetailPage({
         </Card>
       ) : (
         <Card withBorder p={0}>
-          <Table highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Date</Table.Th>
-                <Table.Th>Payee</Table.Th>
-                <Table.Th>Description</Table.Th>
-                <Table.Th>Added by</Table.Th>
-                <Table.Th style={{ textAlign: "right" }}>Amount</Table.Th>
-                <Table.Th style={{ width: "50px" }}></Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {expenses.map((expense) => (
-                <Table.Tr key={expense.id}>
-                  <Table.Td>
-                    {dayjs(expense.date).format("MMM D, YYYY")}
-                  </Table.Td>
-                  <Table.Td>
-                    <Group gap="xs" wrap="nowrap">
-                      <Text fw={500}>{expense.payee.name}</Text>
-                      <RefundStatusBadge status={getRefundSummary(expense).status} />
-                    </Group>
-                    {expense.location && (
-                      <Text size="xs" c="dimmed">
-                        {expense.location}
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="sm" lineClamp={1}>
-                      {expense.description || "-"}
-                    </Text>
-                  </Table.Td>
-                  <Table.Td>
-                    {expense.createdBy ? (
-                      <ExpenseCreatorBadge user={expense.createdBy} />
-                    ) : (
-                      <Text c="dimmed" size="sm">
-                        -
-                      </Text>
-                    )}
-                  </Table.Td>
-                  <Table.Td style={{ textAlign: "right" }}>
-                    <ExpenseAmountCell expense={expense} currency={budget?.currency} />
-                  </Table.Td>
-                  <Table.Td>
-                    <Menu position="bottom-end" withinPortal>
-                      <Menu.Target>
-                        <ActionIcon variant="subtle" color="gray">
-                          <IconDots size={16} />
-                        </ActionIcon>
-                      </Menu.Target>
-                      <Menu.Dropdown>
-                        <Menu.Item
-                          leftSection={<IconEdit size={14} />}
-                          component={Link}
-                          href={`/dashboard/expenses/${expense.id}/edit`}
-                        >
-                          Edit
-                        </Menu.Item>
-                        <Menu.Item
-                          leftSection={<IconReceiptRefund size={14} />}
-                          component={Link}
-                          href={`/dashboard/expenses/${expense.id}/edit#refunds`}
-                        >
-                          Refunds
-                        </Menu.Item>
-                        <Menu.Item
-                          leftSection={<IconTrash size={14} />}
-                          color="red"
-                          onClick={() => handleDeleteExpense(expense.id)}
-                        >
-                          Delete
-                        </Menu.Item>
-                      </Menu.Dropdown>
-                    </Menu>
-                  </Table.Td>
+          <Table.ScrollContainer minWidth={800}>
+            <Table highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Date</Table.Th>
+                  <Table.Th>Payee</Table.Th>
+                  <Table.Th>Description</Table.Th>
+                  <Table.Th>Added by</Table.Th>
+                  <Table.Th style={{ textAlign: "right" }}>Amount</Table.Th>
+                  <Table.Th style={{ width: "50px" }}></Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {expenses.map((expense) => (
+                  <ExpenseListRow
+                    key={expense.id}
+                    expense={expense}
+                    currency={budget?.currency}
+                    onDelete={handleDeleteExpense}
+                  />
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </Card>
       )}
 
