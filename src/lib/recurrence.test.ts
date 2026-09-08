@@ -73,6 +73,31 @@ describe("getOccurrenceDatesInRange", () => {
     assert.equal(count, 15);
   });
 
+  it("excludes a later occurrence when end date is before the next scheduled date", () => {
+    const anchor = new Date("2026-08-20T00:00:00");
+    const endDate = new Date("2026-09-10T00:00:00");
+
+    assert.deepEqual(
+      getOccurrenceDatesInRange(
+        anchor,
+        "MONTHLY",
+        endDate,
+        period("2026-08-01", "2026-08-31")
+      ).map((d) => d.toISOString().slice(0, 10)),
+      ["2026-08-20"]
+    );
+
+    assert.equal(
+      countOccurrencesInRange(
+        anchor,
+        "MONTHLY",
+        endDate,
+        period("2026-09-01", "2026-09-30")
+      ),
+      0
+    );
+  });
+
   it("returns no occurrences before the anchor date", () => {
     const anchor = new Date("2026-03-15T00:00:00");
     assert.equal(
