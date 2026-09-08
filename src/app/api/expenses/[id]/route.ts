@@ -11,6 +11,7 @@ import {
   mapRefundGuardError,
 } from "@/lib/refund-guard";
 import { activeOnly, isArchived } from "@/lib/archive";
+import { normalizeRecurrenceInput } from "@/lib/expense-recurrence";
 
 export async function GET(
   req: NextRequest,
@@ -94,9 +95,9 @@ export async function PATCH(
 
     const {
       payee,
-      budgetId: _budgetId,
       date,
       recurrence,
+      recurrenceEndDate,
       envelopeId,
       ...rest
     } = result.data;
@@ -126,8 +127,30 @@ export async function PATCH(
       updateData.date = newDate;
     }
 
+    if (recurrence !== undefined && recurrence !== "NONE") {
+      const refundCount = await prisma.refund.count({ where: { expenseId: id } });
+      if (refundCount > 0) {
+        return NextResponse.json(
+          errorResponse(
+            "Cannot make a refunded expense recurring. Remove the refunds first."
+          ),
+          { status: 400 }
+        );
+      }
+    }
+
     if (recurrence !== undefined) {
-      updateData.recurrence = recurrence === "NONE" ? null : recurrence;
+      const normalizedRecurrence = normalizeRecurrenceInput(
+        recurrence,
+        recurrenceEndDate
+      );
+      updateData.isRecurring = normalizedRecurrence.isRecurring;
+      updateData.recurrence = normalizedRecurrence.recurrence;
+      updateData.recurrenceEndDate = normalizedRecurrence.recurrenceEndDate;
+    } else if (recurrenceEndDate !== undefined) {
+      updateData.recurrenceEndDate = recurrenceEndDate
+        ? new Date(recurrenceEndDate)
+        : null;
     }
 
     // Refunds mirror the expense date, so a date change has to propagate to

@@ -35,11 +35,12 @@ import { useExpenseStore } from "@/stores/expenseStore";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
-import { computeCarryAndPeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
-import { sumRefundAmounts } from "@/lib/refunds";
+import { resolveEnvelopeAllocation } from "@/lib/budget-period";
+import { projectExpensesForPeriodView } from "@/lib/expense-period-view";
+import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
+import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
 import { ExpenseListRow } from "@/components/expenses/ExpenseListRow";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
-import dayjs from "dayjs";
 
 export default function EnvelopeDetailPage({
   params,
@@ -187,42 +188,45 @@ export default function EnvelopeDetailPage({
     [envelope, budgets]
   );
 
+  const envelopeList = useMemo(
+    () => (envelope ? [envelope] : []),
+    [envelope]
+  );
+
+  const {
+    periodTotals,
+    referenceDate,
+    isCurrentPeriod,
+    canGoPrevious,
+    canGoNext,
+    hasMultiplePeriods,
+    viewableDateRange,
+    goToPreviousPeriod,
+    goToNextPeriod,
+    goToCurrentPeriod,
+    goToPeriodContainingDate,
+  } = useBudgetPeriodView(envelopeList, expenses);
+
   const budgetRole = getMembershipRole(budget?.members, session?.user?.id);
   const envelopeRole = getMembershipRole(envelope?.members, session?.user?.id);
   const canManage = canManageEnvelope(budgetRole, envelopeRole);
 
-  const periodTotals = useMemo(() => {
-    if (!envelope || !budget) return null;
-    const budgetInput = {
-      periodType: budget.periodType,
-      periodDay: budget.periodDay ?? null,
-      customDays: budget.customDays ?? null,
-      startDate: budget.startDate ? new Date(budget.startDate) : null,
-      createdAt: new Date(budget.createdAt),
-      carryOverRemainder: budget.carryOverRemainder,
-    };
-    const envelopeInputs = [
-      {
-        id: envelope.id,
-        allocation: Number(envelope.allocation),
-        allocationType: envelope.allocationType ?? "AMOUNT",
-        carryOverRemainder: envelope.carryOverRemainder ?? null,
-      },
-    ];
-    const expenseInputs = expenses.map((e) => ({
-      envelopeId: e.envelopeId,
-      date: new Date(e.date),
-      amount: Number(e.amount),
-      refundedAmount: sumRefundAmounts(e.refunds),
-    }));
-    return computeCarryAndPeriodTotals(
-      budgetInput,
-      envelopeInputs,
-      expenseInputs,
-      undefined,
-      Number(budget.amount)
+  const periodExpenses = useMemo(() => {
+    if (!periodTotals) return [];
+    return projectExpensesForPeriodView(
+      expenses.map((e) => ({
+        ...e,
+        id: e.id,
+        envelopeId: e.envelopeId,
+        date: new Date(e.date),
+        amount: Number(e.amount),
+        recurrence: e.recurrence ?? null,
+        recurrenceEndDate: e.recurrenceEndDate ? new Date(e.recurrenceEndDate) : null,
+      })),
+      periodTotals.currentPeriod,
+      params.id
     );
-  }, [budget, envelope, expenses]);
+  }, [expenses, periodTotals, params.id]);
 
   if (loading) {
     return (
@@ -295,11 +299,23 @@ export default function EnvelopeDetailPage({
               {envelope.description && (
                 <Text c="dimmed">{envelope.description}</Text>
               )}
-              {periodTotals && (
-                <Text size="sm" c="dimmed" mt={4}>
-                  Current period: {dayjs(periodTotals.currentPeriod.start).format("MMM D, YYYY")} –{" "}
-                  {dayjs(periodTotals.currentPeriod.end).format("MMM D, YYYY")}
-                </Text>
+              {periodTotals && viewableDateRange && (
+                <Group mt="sm">
+                  <PeriodNavigator
+                    period={periodTotals.currentPeriod}
+                    referenceDate={referenceDate}
+                    isCurrentPeriod={isCurrentPeriod}
+                    canGoPrevious={canGoPrevious}
+                    canGoNext={canGoNext}
+                    hasMultiplePeriods={hasMultiplePeriods}
+                    minDate={viewableDateRange.min}
+                    maxDate={viewableDateRange.max}
+                    onPrevious={goToPreviousPeriod}
+                    onNext={goToNextPeriod}
+                    onCurrent={goToCurrentPeriod}
+                    onSelectDate={goToPeriodContainingDate}
+                  />
+                </Group>
               )}
             </div>
             </Group>
@@ -451,10 +467,14 @@ export default function EnvelopeDetailPage({
         </Button>
       </Group>
 
-      {expenses.length === 0 ? (
+      {periodExpenses.length === 0 ? (
         <Card withBorder p="xl">
           <Stack align="center">
-            <Text c="dimmed">No expenses in this envelope yet</Text>
+            <Text c="dimmed">
+              {isCurrentPeriod
+                ? "No expenses in this envelope for the current period"
+                : "No expenses in this envelope for the selected period"}
+            </Text>
             <Button
               component={Link}
               href={`/dashboard/expenses/new?envelopeId=${params.id}`}
@@ -480,9 +500,9 @@ export default function EnvelopeDetailPage({
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {expenses.map((expense) => (
+                {periodExpenses.map((expense) => (
                   <ExpenseListRow
-                    key={expense.id}
+                    key={expense.occurrenceKey}
                     expense={expense}
                     currency={budget?.currency}
                     onDelete={handleDeleteExpense}

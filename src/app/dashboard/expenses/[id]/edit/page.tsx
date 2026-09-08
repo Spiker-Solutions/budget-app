@@ -52,6 +52,7 @@ type ExpenseEditFormValues = {
   envelopeId: string;
   date: Date;
   recurrence: "NONE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY";
+  recurrenceEndDate: Date | null;
 };
 
 /** GET /api/expenses/[id] nests the budget inside the envelope. */
@@ -95,6 +96,7 @@ export default function EditExpensePage({
       envelopeId: "",
       date: new Date(),
       recurrence: "NONE",
+      recurrenceEndDate: null,
     },
     validate: {
       amount: (value) => {
@@ -161,6 +163,9 @@ export default function EditExpensePage({
           envelopeId: expenseData.envelopeId ?? "",
           date: new Date(expenseData.date),
           recurrence: expenseData.recurrence ?? "NONE",
+          recurrenceEndDate: expenseData.recurrenceEndDate
+            ? new Date(expenseData.recurrenceEndDate)
+            : null,
         });
       } catch (error) {
         console.error("Failed to fetch expense:", error);
@@ -235,6 +240,7 @@ export default function EditExpensePage({
         envelopeId: values.envelopeId,
         date: values.date,
         recurrence: values.recurrence,
+        recurrenceEndDate: values.recurrenceEndDate,
       };
 
       const updated = await updateExpense(params.id, payload);
@@ -297,6 +303,7 @@ export default function EditExpensePage({
     value: e.id,
     label: e.name,
   }));
+  const isRecurring = form.values.recurrence !== "NONE";
 
   return (
     <Stack>
@@ -357,15 +364,29 @@ export default function EditExpensePage({
 
             <DateField
               label="Date"
-              description="Type MM/DD/YYYY or pick from the calendar"
+              description={
+                isRecurring
+                  ? "First occurrence date — future repeats are calculated from this day"
+                  : "Type MM/DD/YYYY or pick from the calendar"
+              }
               {...form.getInputProps("date")}
             />
 
             <Select
               label="Recurrence"
+              description="Recurring expenses count in every budget period where they occur"
               data={recurrenceOptions}
               {...form.getInputProps("recurrence")}
             />
+
+            {isRecurring && (
+              <DateField
+                label="End date"
+                description="Optional — leave blank to repeat indefinitely"
+                clearable
+                {...form.getInputProps("recurrenceEndDate")}
+              />
+            )}
 
             <TextInput
               label="Location"
@@ -391,15 +412,27 @@ export default function EditExpensePage({
         </form>
       </Card>
 
-      <RefundSection
-        expenseId={expense.id}
-        grossAmount={Number(expense.amount)}
-        expenseDate={expense.date}
-        currency={currency}
-        refunds={refunds}
-        onRefundsChange={handleRefundsChange}
-        canManage
-      />
+      {expense.recurrence ? (
+        <Card withBorder maw={600} id="refunds">
+          <Stack>
+            <Title order={4}>Refunds</Title>
+            <Alert variant="light" color="gray">
+              Refunds are not supported on recurring expenses. Remove recurrence or
+              create a one-time expense if you need to record a refund.
+            </Alert>
+          </Stack>
+        </Card>
+      ) : (
+        <RefundSection
+          expenseId={expense.id}
+          grossAmount={Number(expense.amount)}
+          expenseDate={expense.date}
+          currency={currency}
+          refunds={refunds}
+          onRefundsChange={handleRefundsChange}
+          canManage
+        />
+      )}
 
       <Card withBorder maw={600} style={{ borderColor: "var(--mantine-color-red-4)" }}>
         <Stack>

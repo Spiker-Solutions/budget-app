@@ -98,8 +98,8 @@ export interface CreateExpenseInput {
   date?: Date;
   envelopeId: string;
   budgetId: string;
-  isRecurring?: boolean;
   recurrence?: "NONE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY";
+  recurrenceEndDate?: Date | null;
 }
 
 export interface UpdateExpenseInput {
@@ -110,8 +110,8 @@ export interface UpdateExpenseInput {
   date?: Date;
   envelopeId?: string;
   budgetId?: string;
-  isRecurring?: boolean;
   recurrence?: "NONE" | "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY";
+  recurrenceEndDate?: Date | null;
 }
 
 /** A refund's date is always inherited from its expense, so it is never sent by the client. */

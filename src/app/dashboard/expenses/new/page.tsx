@@ -77,6 +77,7 @@ function NewExpenseForm() {
       envelopeId: envelopeIdParam,
       date: new Date(),
       recurrence: "NONE",
+      recurrenceEndDate: null,
     },
     validate: {
       amount: (value) => (value <= 0 ? "Amount must be greater than 0" : null),
@@ -169,6 +170,7 @@ function NewExpenseForm() {
     value: e.id,
     label: e.name,
   }));
+  const isRecurring = form.values.recurrence !== "NONE";
 
   return (
     <Stack>
@@ -213,15 +215,29 @@ function NewExpenseForm() {
 
             <DateField
               label="Date"
-              description="Type MM/DD/YYYY or pick from the calendar"
+              description={
+                isRecurring
+                  ? "First occurrence date — future repeats are calculated from this day"
+                  : "Type MM/DD/YYYY or pick from the calendar"
+              }
               {...form.getInputProps("date")}
             />
 
             <Select
               label="Recurrence"
+              description="Recurring expenses count in every budget period where they occur"
               data={recurrenceOptions}
               {...form.getInputProps("recurrence")}
             />
+
+            {isRecurring && (
+              <DateField
+                label="End date"
+                description="Optional — leave blank to repeat indefinitely"
+                clearable
+                {...form.getInputProps("recurrenceEndDate")}
+              />
+            )}
 
             <TextInput
               label="Location"

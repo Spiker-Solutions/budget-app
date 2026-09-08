@@ -38,6 +38,8 @@ type ExpenseLike = {
   envelopeId: string;
   date: Date | string;
   amount: unknown;
+  recurrence?: "DAILY" | "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "YEARLY" | null;
+  recurrenceEndDate?: Date | string | null;
   refunds?: RefundAmountLike[];
 };
 
@@ -89,6 +91,8 @@ export function useBudgetPeriodView(
       date: new Date(e.date),
       amount: Number(e.amount),
       refundedAmount: sumRefundAmounts(e.refunds),
+      recurrence: e.recurrence ?? null,
+      recurrenceEndDate: e.recurrenceEndDate ? new Date(e.recurrenceEndDate) : null,
     }));
     return computeCarryAndPeriodTotals(
       budgetInput,

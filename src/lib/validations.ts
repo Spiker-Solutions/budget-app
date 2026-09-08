@@ -66,7 +66,7 @@ export const updateEnvelopeSchema = envelopeSchemaBase
     );
   });
 
-export const createExpenseSchema = z.object({
+const expenseSchemaBase = z.object({
   amount: z.number().positive("Amount must be positive"),
   payee: z.string().min(1, "Payee is required"),
   description: z.string().max(500).optional(),
@@ -74,11 +74,40 @@ export const createExpenseSchema = z.object({
   date: z.string().or(z.date()).optional(),
   envelopeId: z.string().min(1, "Envelope is required"),
   budgetId: z.string().min(1, "Budget is required"),
-  isRecurring: z.boolean().default(false),
-  recurrence: z.enum(["NONE", "DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"]).default("NONE"),
+  recurrence: z
+    .enum(["NONE", "DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"])
+    .default("NONE"),
+  recurrenceEndDate: z.string().or(z.date()).nullable().optional(),
 });
 
-export const updateExpenseSchema = createExpenseSchema.partial();
+function validateRecurrenceEndDate(
+  data: {
+    recurrence?: string;
+    recurrenceEndDate?: string | Date | null;
+    date?: string | Date;
+  },
+  ctx: z.RefinementCtx
+) {
+  if (data.recurrence === "NONE" || !data.recurrence) return;
+  if (!data.recurrenceEndDate || !data.date) return;
+
+  const end = new Date(data.recurrenceEndDate);
+  const start = new Date(data.date);
+  if (end < start) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "End date must be on or after the first occurrence date",
+      path: ["recurrenceEndDate"],
+    });
+  }
+}
+
+export const createExpenseSchema = expenseSchemaBase.superRefine(validateRecurrenceEndDate);
+
+export const updateExpenseSchema = expenseSchemaBase
+  .partial()
+  .omit({ budgetId: true })
+  .superRefine(validateRecurrenceEndDate);
 
 /**
  * A refund has no `date` field: it always inherits the parent expense's date,

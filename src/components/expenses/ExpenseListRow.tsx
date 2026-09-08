@@ -9,16 +9,19 @@ import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import { ExpenseAmountCell } from "@/components/refunds/ExpenseAmountCell";
 import { RefundStatusBadge } from "@/components/refunds/RefundStatusBadge";
 import { getRefundSummary, type AmountLike, type RefundAmountLike } from "@/lib/refunds";
-import type { Envelope, Payee, User } from "@prisma/client";
+import type { Envelope, Payee, RecurrenceType, User } from "@prisma/client";
+import { RecurringBadge } from "@/components/expenses/RecurringBadge";
 
 export type ExpenseListRowData = {
   id: string;
   date: Date | string;
+  displayDate?: Date | string;
   amount: AmountLike;
   payee: Pick<Payee, "name">;
   envelope?: Pick<Envelope, "id" | "name" | "icon" | "color"> | null;
   description?: string | null;
   location?: string | null;
+  recurrence?: RecurrenceType | null;
   createdBy?: Pick<User, "id" | "name" | "email" | "image"> | null;
   refunds?: RefundAmountLike[];
 };
@@ -38,16 +41,20 @@ export function ExpenseListRow({
 }: ExpenseListRowProps) {
   const router = useRouter();
   const editHref = `/dashboard/expenses/${expense.id}/edit`;
+  const rowDate = expense.displayDate ?? expense.date;
 
   return (
     <Table.Tr
       style={{ cursor: "pointer" }}
       onClick={() => router.push(editHref)}
     >
-      <Table.Td>{dayjs(expense.date).format("MMM D, YYYY")}</Table.Td>
+      <Table.Td>{dayjs(rowDate).format("MMM D, YYYY")}</Table.Td>
       <Table.Td>
         <Group gap="xs" wrap="nowrap">
           <Text fw={500}>{expense.payee.name}</Text>
+          {expense.recurrence && (
+            <RecurringBadge recurrence={expense.recurrence} compact />
+          )}
           <RefundStatusBadge
             status={getRefundSummary(expense).status}
             compact
