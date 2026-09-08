@@ -31,6 +31,13 @@ export class ExpenseAmountBelowRefundsError extends Error {
   }
 }
 
+export class RecurringExpenseRefundError extends Error {
+  constructor() {
+    super("Refunds are not supported on recurring expenses");
+    this.name = "RecurringExpenseRefundError";
+  }
+}
+
 export class ExpenseVanishedError extends Error {
   constructor() {
     super("Expense no longer exists");
@@ -38,14 +45,23 @@ export class ExpenseVanishedError extends Error {
   }
 }
 
-type LockedExpense = { id: string; amount: Prisma.Decimal; date: Date };
+type LockedExpense = {
+  id: string;
+  amount: Prisma.Decimal;
+  date: Date;
+  isRecurring: boolean;
+  recurrence: string | null;
+};
 
 async function lockExpense(
   tx: Prisma.TransactionClient,
   expenseId: string
 ): Promise<LockedExpense> {
   const rows = await tx.$queryRaw<LockedExpense[]>`
-    SELECT "id", "amount", "date" FROM "Expense" WHERE "id" = ${expenseId} FOR UPDATE
+    SELECT "id", "amount", "date", "isRecurring", "recurrence"
+    FROM "Expense"
+    WHERE "id" = ${expenseId}
+    FOR UPDATE
   `;
 
   const expense = rows[0];
@@ -85,6 +101,10 @@ export async function assertRefundFitsExpense(
   }: { expenseId: string; amount: number; excludeRefundId?: string }
 ): Promise<LockedExpense> {
   const expense = await lockExpense(tx, expenseId);
+
+  if (expense.isRecurring || expense.recurrence) {
+    throw new RecurringExpenseRefundError();
+  }
 
   const grossCents = toCents(expense.amount);
   const otherRefundCents = await sumRefundCents(tx, expenseId, excludeRefundId);
@@ -142,6 +162,14 @@ export function mapRefundGuardError(
         error.refundedTotal,
         currency
       )} already refunded. Reduce or remove the refunds first.`,
+      status: 400,
+    };
+  }
+
+  if (error instanceof RecurringExpenseRefundError) {
+    return {
+      message:
+        "Refunds are not supported on recurring expenses. Remove recurrence or create a one-time expense instead.",
       status: 400,
     };
   }

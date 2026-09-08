@@ -17,6 +17,7 @@ import { useExpenseStore } from "@/stores/expenseStore";
 import { useUiStore } from "@/stores/uiStore";
 import { formatCurrency } from "@/lib/client-utils";
 import { filterExpensesInRange } from "@/lib/budget-period";
+import { projectExpensesForPeriodView } from "@/lib/expense-period-view";
 import { getRefundSummary, roundMoney } from "@/lib/refunds";
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
@@ -48,13 +49,22 @@ export default function ExpensesPage() {
   }, [currentBudgetId, fetchExpenses]);
 
   const periodExpenses = useMemo(() => {
-    if (!periodTotals) return expenses;
-    return filterExpensesInRange(
+    if (!periodTotals) {
+      return expenses.map((e) => ({
+        ...e,
+        displayDate: new Date(e.date),
+        occurrenceKey: e.id,
+      }));
+    }
+    return projectExpensesForPeriodView(
       expenses.map((e) => ({
         ...e,
+        id: e.id,
         envelopeId: e.envelopeId,
         date: new Date(e.date),
         amount: Number(e.amount),
+        recurrence: e.recurrence,
+        recurrenceEndDate: e.recurrenceEndDate ? new Date(e.recurrenceEndDate) : null,
       })),
       periodTotals.currentPeriod
     );
@@ -182,7 +192,7 @@ export default function ExpensesPage() {
               <Table.Tbody>
                 {periodExpenses.map((expense) => (
                   <ExpenseListRow
-                    key={expense.id}
+                    key={expense.occurrenceKey}
                     expense={expense}
                     currency={currentBudget.currency}
                     showEnvelope

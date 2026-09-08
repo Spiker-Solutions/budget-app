@@ -6,6 +6,7 @@ import { successResponse, errorResponse } from "@/lib/utils";
 import { createExpenseSchema } from "@/lib/validations";
 import { expenseInclude } from "@/lib/expense-queries";
 import { activeOnly, isArchived } from "@/lib/archive";
+import { normalizeRecurrenceInput } from "@/lib/expense-recurrence";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -126,7 +127,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { amount, payee, description, location, date, envelopeId, budgetId, isRecurring, recurrence } = result.data;
+    const { amount, payee, description, location, date, envelopeId, budgetId, recurrence, recurrenceEndDate } =
+      result.data;
+
+    const normalizedRecurrence = normalizeRecurrenceInput(recurrence, recurrenceEndDate);
 
     const membership = await prisma.budgetUser.findUnique({
       where: {
@@ -183,8 +187,9 @@ export async function POST(req: NextRequest) {
         description,
         location,
         date: date ? new Date(date) : new Date(),
-        isRecurring,
-        recurrence: recurrence === "NONE" ? null : recurrence,
+        isRecurring: normalizedRecurrence.isRecurring,
+        recurrence: normalizedRecurrence.recurrence,
+        recurrenceEndDate: normalizedRecurrence.recurrenceEndDate,
         payeeId: payeeRecord.id,
         envelopeId,
         createdById: session.user.id,

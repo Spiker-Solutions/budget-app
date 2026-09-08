@@ -178,8 +178,9 @@ model Expense {
   description String?
   location    String?
   date        DateTime        @default(now())
-  isRecurring Boolean         @default(false)
-  recurrence  RecurrenceType?
+  isRecurring        Boolean         @default(false)
+  recurrence         RecurrenceType?
+  recurrenceEndDate  DateTime?
 
   payeeId     String
   envelopeId  String

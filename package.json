@@ -10,7 +10,8 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:generate-migrate": "npm run generate-migrate",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "test:recurrence": "tsx --test src/lib/recurrence.test.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

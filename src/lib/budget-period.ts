@@ -1,5 +1,6 @@
-import type { PeriodType } from "@prisma/client";
+import type { PeriodType, RecurrenceType } from "@prisma/client";
 import { roundMoney } from "@/lib/refunds";
+import { countOccurrencesInRange, isRecurringExpense } from "@/lib/recurrence";
 
 /**
  * Period boundaries use the JavaScript local timezone (same as DatePicker / browser),
@@ -32,8 +33,13 @@ export type ExpenseInPeriodInput = {
    * Combined amount of every refund against this expense. Refunds inherit the
    * expense's date, so they always land in the same period and simply reduce
    * that period's net spend — no separate refund date scan is needed.
+   *
+   * Refunds are not supported on recurring expenses; this field is ignored when
+   * `recurrence` is set.
    */
   refundedAmount?: number;
+  recurrence?: RecurrenceType | null;
+  recurrenceEndDate?: Date | null;
 };
 
 export type EnvelopePeriodTotals = {
@@ -203,6 +209,23 @@ export function getPreviousPeriod(
   return prev;
 }
 
+function occurrenceCountInRange(
+  expense: ExpenseInPeriodInput,
+  range: PeriodBounds
+): number {
+  if (!isRecurringExpense(expense.recurrence)) {
+    const t = expense.date.getTime();
+    return t >= range.start.getTime() && t <= range.end.getTime() ? 1 : 0;
+  }
+
+  return countOccurrencesInRange(
+    expense.date,
+    expense.recurrence,
+    expense.recurrenceEndDate,
+    range
+  );
+}
+
 function reduceInRange(
   expenses: ExpenseInPeriodInput[],
   range: PeriodBounds,
@@ -211,8 +234,9 @@ function reduceInRange(
 ): number {
   const total = expenses.reduce((sum, e) => {
     if (envelopeId !== undefined && e.envelopeId !== envelopeId) return sum;
-    if (!isExpenseInRange(e, range)) return sum;
-    return sum + valueOf(e);
+    const occurrences = occurrenceCountInRange(e, range);
+    if (occurrences === 0) return sum;
+    return sum + valueOf(e) * occurrences;
   }, 0);
   // Amounts are DECIMAL(12,2); rounding to cents keeps float drift from
   // rendering a fully refunded period as a few billionths over or under.
@@ -234,7 +258,10 @@ export function sumRefundsInRange(
   range: PeriodBounds,
   envelopeId?: string
 ): number {
-  return reduceInRange(expenses, range, envelopeId, (e) => e.refundedAmount ?? 0);
+  return reduceInRange(expenses, range, envelopeId, (e) => {
+    if (isRecurringExpense(e.recurrence)) return 0;
+    return e.refundedAmount ?? 0;
+  });
 }
 
 /**
@@ -246,12 +273,14 @@ export function sumExpensesInRange(
   range: PeriodBounds,
   envelopeId?: string
 ): number {
-  return reduceInRange(expenses, range, envelopeId, (e) => e.amount - (e.refundedAmount ?? 0));
+  return reduceInRange(expenses, range, envelopeId, (e) => {
+    if (isRecurringExpense(e.recurrence)) return e.amount;
+    return e.amount - (e.refundedAmount ?? 0);
+  });
 }
 
 export function isExpenseInRange(expense: ExpenseInPeriodInput, range: PeriodBounds): boolean {
-  const t = expense.date.getTime();
-  return t >= range.start.getTime() && t <= range.end.getTime();
+  return occurrenceCountInRange(expense, range) > 0;
 }
 
 export function filterExpensesInRange<T extends ExpenseInPeriodInput>(

@@ -36,6 +36,7 @@ import { useBudgetStore } from "@/stores/budgetStore";
 import { canManageEnvelope, getMembershipRole } from "@/lib/permissions";
 import { formatCurrency } from "@/lib/client-utils";
 import { computeCarryAndPeriodTotals, resolveEnvelopeAllocation } from "@/lib/budget-period";
+import { projectExpensesForPeriodView } from "@/lib/expense-period-view";
 import { sumRefundAmounts } from "@/lib/refunds";
 import { ExpenseListRow } from "@/components/expenses/ExpenseListRow";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
@@ -214,6 +215,8 @@ export default function EnvelopeDetailPage({
       date: new Date(e.date),
       amount: Number(e.amount),
       refundedAmount: sumRefundAmounts(e.refunds),
+      recurrence: e.recurrence ?? null,
+      recurrenceEndDate: e.recurrenceEndDate ? new Date(e.recurrenceEndDate) : null,
     }));
     return computeCarryAndPeriodTotals(
       budgetInput,
@@ -223,6 +226,23 @@ export default function EnvelopeDetailPage({
       Number(budget.amount)
     );
   }, [budget, envelope, expenses]);
+
+  const periodExpenses = useMemo(() => {
+    if (!periodTotals) return [];
+    return projectExpensesForPeriodView(
+      expenses.map((e) => ({
+        ...e,
+        id: e.id,
+        envelopeId: e.envelopeId,
+        date: new Date(e.date),
+        amount: Number(e.amount),
+        recurrence: e.recurrence ?? null,
+        recurrenceEndDate: e.recurrenceEndDate ? new Date(e.recurrenceEndDate) : null,
+      })),
+      periodTotals.currentPeriod,
+      params.id
+    );
+  }, [expenses, periodTotals, params.id]);
 
   if (loading) {
     return (
@@ -451,10 +471,10 @@ export default function EnvelopeDetailPage({
         </Button>
       </Group>
 
-      {expenses.length === 0 ? (
+      {periodExpenses.length === 0 ? (
         <Card withBorder p="xl">
           <Stack align="center">
-            <Text c="dimmed">No expenses in this envelope yet</Text>
+            <Text c="dimmed">No expenses in this envelope for the current period</Text>
             <Button
               component={Link}
               href={`/dashboard/expenses/new?envelopeId=${params.id}`}
@@ -480,9 +500,9 @@ export default function EnvelopeDetailPage({
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {expenses.map((expense) => (
+                {periodExpenses.map((expense) => (
                   <ExpenseListRow
-                    key={expense.id}
+                    key={expense.occurrenceKey}
                     expense={expense}
                     currency={budget?.currency}
                     onDelete={handleDeleteExpense}
