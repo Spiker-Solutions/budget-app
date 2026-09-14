@@ -16,7 +16,7 @@ import {
   getPreviousPeriod,
 } from "@/lib/budget-period";
 import { expensesToPeriodInputs } from "@/lib/expense-period-inputs";
-import { normalizePayeeName } from "@/lib/utils";
+import { findOrCreatePayeeForGoalName } from "@/lib/goal-payee";
 import { canManageBudget } from "@/lib/permissions";
 
 async function loadBudgetContext(budgetId: string, userId: string) {
@@ -283,33 +283,24 @@ export async function POST(
         }
       }
 
-      const payeeName = "Goal contribution (remainder)";
-      const normalized = normalizePayeeName(payeeName);
-      let payee = await prisma.payee.findUnique({
-        where: {
-          budgetId_normalizedName: { budgetId, normalizedName: normalized },
-        },
-      });
-      if (!payee) {
-        payee = await prisma.payee.create({
-          data: {
-            name: payeeName,
-            normalizedName: normalized,
-            budgetId,
-          },
-        });
-      }
+      const goalNames = new Map(
+        ctx.budget.goals.map((g) => [g.id, g.name] as const)
+      );
 
       await prisma.$transaction(async (tx) => {
         for (const row of parsed.data.allocations) {
           if (row.keepInEnvelope || row.amount <= 0 || !row.goalId) continue;
+
+          const goalName = goalNames.get(row.goalId);
+          if (!goalName) continue;
+          const payee = await findOrCreatePayeeForGoalName(budgetId, goalName, tx);
 
           await tx.expense.create({
             data: {
               amount: row.amount,
               description: "Period remainder allocation",
               date: periodEnd,
-              payeeId: payee!.id,
+              payeeId: payee.id,
               envelopeId: row.envelopeId,
               goalId: row.goalId,
               createdById: session.user!.id,

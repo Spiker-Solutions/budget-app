@@ -54,6 +54,8 @@ async function recordDemo(name, fn) {
 const ONLY = process.env.ONLY?.split(",") ?? null;
 
 async function main() {
+  const { execSync } = await import("child_process");
+
   const all = [
   ["01-saving-goal-creation", async (page) => {
     await goAddGoal(page);
@@ -81,47 +83,50 @@ async function main() {
     await page.locator(".mantine-SegmentedControl-label").filter({ hasText: "Goal contribution" }).click();
     await page.getByRole("textbox", { name: "Goal" }).click();
     await page.getByRole("option").first().click();
+    await page.waitForTimeout(500);
+    await page.getByText("Payee:").waitFor();
     await page.getByRole("textbox", { name: "Amount" }).fill("150");
-    await page.getByRole("textbox", { name: "Payee" }).fill("Bank transfer");
     await page.getByRole("textbox", { name: "Envelope" }).click();
     await page.getByRole("option").first().click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.waitForTimeout(2000);
+    await page.getByText("Vacation Fund Demo").first().click();
+    await page.waitForTimeout(1500);
   }],
   ["04-remainder-wizard", async (page) => {
     const openWizard = page.getByRole("button", { name: /Open wizard|Allocate remainders/ });
-    if (await openWizard.count()) {
-      await openWizard.first().click();
-      await page.waitForTimeout(1000);
-      const actionSelect = page.locator("table tbody tr").first().locator("input").first();
-      if (await actionSelect.count()) {
-        await actionSelect.click({ force: true });
-        await page.getByRole("option", { name: "Send to save goal" }).click();
-        const goalSelect = page.locator("table tbody tr").first().locator("input").nth(1);
-        await goalSelect.click({ force: true });
-        await page.getByRole("option").first().click();
-      }
-      await page.getByRole("button", { name: "Confirm allocations" }).click();
-      await page.waitForTimeout(2000);
-    } else {
-      await page.goto(`${BASE}/dashboard`);
-      await page.waitForTimeout(2000);
-    }
+    await openWizard.first().waitFor({ timeout: 15000 });
+    await openWizard.first().click();
+    await page.waitForTimeout(800);
+    await page.getByTestId("wizard-action-0").click();
+    await page.getByRole("option", { name: "Send to save goal" }).click();
+    await page.getByTestId("wizard-goal-0").click();
+    await page.getByRole("option").first().click();
+    await page.getByRole("button", { name: "Confirm allocations" }).click();
+    await page.getByText("Allocations saved").waitFor({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+    await page.getByText("Vacation Fund Demo").first().click();
+    await page.waitForTimeout(2000);
   }],
   ["05-debt-charge-and-dashboard", async (page) => {
     await page.goto(`${BASE}/dashboard`);
     await page.getByText("Credit Card Demo").first().click();
-    await page.getByRole("button", { name: "Add charge" }).click();
-    await page.getByLabel("Amount").fill("25");
-    await page.getByRole("button", { name: "Add charge" }).click();
+    await page.getByRole("main").getByRole("button", { name: "Add charge" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("textbox", { name: "Amount" }).fill("25");
+    await dialog.getByRole("button", { name: "Add charge" }).click();
+    await page.getByText("Charge added").waitFor({ timeout: 10000 });
     await page.waitForTimeout(1500);
-    await page.goto(`${BASE}/dashboard`);
-    await page.waitForTimeout(2000);
+    await page.getByText("Activity").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1500);
   }],
   ];
 
   for (const [name, fn] of all) {
     if (ONLY && !ONLY.includes(name.split("-")[0]) && !ONLY.includes(name)) continue;
+    if (name === "04-remainder-wizard") {
+      execSync("npx tsx scripts/setup-wizard-demo.ts", { stdio: "inherit", cwd: "/workspace" });
+    }
     await recordDemo(name, fn);
   }
 }

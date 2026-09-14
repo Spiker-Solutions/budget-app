@@ -92,7 +92,8 @@ function NewExpenseForm() {
     },
     validate: {
       amount: (value) => (value <= 0 ? "Amount must be greater than 0" : null),
-      payee: (value) => (value.length < 1 ? "Payee is required" : null),
+      payee: (value) =>
+        transactionMode === "expense" && (value ?? "").length < 1 ? "Payee is required" : null,
       envelopeId: (value) => (!value || value.length < 1 ? "Envelope is required" : null),
       goalId: (value, values) => {
         if (transactionMode === "contribution" && (!value || value.length < 1)) {
@@ -127,17 +128,29 @@ function NewExpenseForm() {
     setLoading(true);
 
     try {
+      const selectedGoal =
+        transactionMode === "contribution"
+          ? goals.find((g) => g.id === values.goalId)
+          : null;
+
       const expense = await createExpense({
         ...values,
         budgetId: currentBudgetId,
         envelopeId: values.envelopeId,
         goalId: transactionMode === "contribution" ? values.goalId : null,
+        payee:
+          transactionMode === "contribution" && selectedGoal
+            ? selectedGoal.name
+            : values.payee,
       });
 
       if (expense) {
         notifications.show({
-          title: "Expense added",
-          message: `$${expense.amount} expense at "${expense.payee.name}" has been recorded`,
+          title: transactionMode === "contribution" ? "Contribution added" : "Expense added",
+          message:
+            transactionMode === "contribution"
+              ? `$${expense.amount} toward "${expense.payee.name}"`
+              : `$${expense.amount} expense at "${expense.payee.name}" has been recorded`,
           color: "green",
         });
         await fetchExpenses(undefined, currentBudgetId);
@@ -237,13 +250,21 @@ function NewExpenseForm() {
               {...form.getInputProps("amount")}
             />
 
-            <Autocomplete
-              label="Payee"
-              placeholder="Where did you spend?"
-              required
-              data={payeeOptions}
-              {...form.getInputProps("payee")}
-            />
+            {transactionMode === "expense" ? (
+              <Autocomplete
+                label="Payee"
+                placeholder="Where did you spend?"
+                required
+                data={payeeOptions}
+                {...form.getInputProps("payee")}
+              />
+            ) : (
+              <Text size="sm" c="dimmed">
+                Payee:{" "}
+                {goals.find((g) => g.id === form.values.goalId)?.name ??
+                  "Select a goal — the goal name is used as the payee"}
+              </Text>
+            )}
 
             <Select
               label="Envelope"

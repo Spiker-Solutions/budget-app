@@ -345,13 +345,19 @@ export default function EditExpensePage({
               {...form.getInputProps("amount")}
             />
 
-            <Autocomplete
-              label="Payee"
-              placeholder="Where did you spend?"
-              required
-              data={payeeOptions}
-              {...form.getInputProps("payee")}
-            />
+            {expense.goalId ? (
+              <Text size="sm" c="dimmed">
+                Payee: {expense.goal?.name ?? expense.payee?.name ?? "Goal"} (from linked goal)
+              </Text>
+            ) : (
+              <Autocomplete
+                label="Payee"
+                placeholder="Where did you spend?"
+                required
+                data={payeeOptions}
+                {...form.getInputProps("payee")}
+              />
+            )}
 
             <Select
               label="Envelope"

@@ -155,6 +155,7 @@ export function RemainderWizardModal({
                   <Table.Td>{formatCurrency(er.remainingThisPeriod, currency)}</Table.Td>
                   <Table.Td>
                     <Select
+                      data-testid={`wizard-action-${idx}`}
                       data={[
                         { value: "keep", label: "Keep in envelope" },
                         { value: "goal", label: "Send to save goal" },
@@ -174,6 +175,7 @@ export function RemainderWizardModal({
                   </Table.Td>
                   <Table.Td>
                     <Select
+                      data-testid={`wizard-goal-${idx}`}
                       placeholder="Goal"
                       data={goalOptions}
                       disabled={rows[idx]?.keepInEnvelope}

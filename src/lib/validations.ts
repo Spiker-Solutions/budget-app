@@ -68,7 +68,7 @@ export const updateEnvelopeSchema = envelopeSchemaBase
 
 const expenseSchemaBase = z.object({
   amount: z.number().positive("Amount must be positive"),
-  payee: z.string().min(1, "Payee is required"),
+  payee: z.string().max(100).optional(),
   description: z.string().max(500).optional(),
   location: z.string().max(200).optional(),
   date: z.string().or(z.date()).optional(),
@@ -103,12 +103,29 @@ function validateRecurrenceEndDate(
   }
 }
 
-export const createExpenseSchema = expenseSchemaBase.superRefine(validateRecurrenceEndDate);
+function validateExpensePayee(
+  data: { payee?: string; goalId?: string | null },
+  ctx: z.RefinementCtx
+) {
+  if (data.goalId) return;
+  if (!data.payee || data.payee.trim().length < 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Payee is required",
+      path: ["payee"],
+    });
+  }
+}
+
+export const createExpenseSchema = expenseSchemaBase
+  .superRefine(validateRecurrenceEndDate)
+  .superRefine(validateExpensePayee);
 
 export const updateExpenseSchema = expenseSchemaBase
   .partial()
   .omit({ budgetId: true })
-  .superRefine(validateRecurrenceEndDate);
+  .superRefine(validateRecurrenceEndDate)
+  .superRefine(validateExpensePayee);
 
 /**
  * A refund has no `date` field: it always inherits the parent expense's date,

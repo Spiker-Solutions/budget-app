@@ -143,7 +143,7 @@ export interface CreateGoalChargeInput {
 
 export interface CreateExpenseInput {
   amount: number;
-  payee: string;
+  payee?: string;
   description?: string;
   location?: string;
   date?: Date;

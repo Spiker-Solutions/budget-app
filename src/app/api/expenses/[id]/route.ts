@@ -13,6 +13,7 @@ import {
 import { activeOnly, isArchived } from "@/lib/archive";
 import { normalizeRecurrenceInput } from "@/lib/expense-recurrence";
 import { validateGoalForExpense } from "@/lib/goal-access";
+import { findOrCreatePayeeForGoalName } from "@/lib/goal-payee";
 
 export async function GET(
   req: NextRequest,
@@ -180,7 +181,23 @@ export async function PATCH(
         });
       }
 
-      if (payee !== undefined) {
+      const effectiveGoalId =
+        goalId !== undefined ? goalId : access.expense.goalId;
+
+      if (effectiveGoalId) {
+        const goal = await tx.goal.findUnique({
+          where: { id: effectiveGoalId },
+          select: { name: true },
+        });
+        if (goal) {
+          const payeeRecord = await findOrCreatePayeeForGoalName(
+            budgetId,
+            goal.name,
+            tx
+          );
+          updateData.payeeId = payeeRecord.id;
+        }
+      } else if (payee !== undefined) {
         const normalizedPayeeName = payee.trim().toLowerCase();
         let payeeRecord = await tx.payee.findUnique({
           where: {
