@@ -12,6 +12,7 @@ import {
 } from "@/lib/refund-guard";
 import { activeOnly, isArchived } from "@/lib/archive";
 import { normalizeRecurrenceInput } from "@/lib/expense-recurrence";
+import { validateGoalForExpense } from "@/lib/goal-access";
 
 export async function GET(
   req: NextRequest,
@@ -99,10 +100,18 @@ export async function PATCH(
       recurrence,
       recurrenceEndDate,
       envelopeId,
+      goalId,
       ...rest
     } = result.data;
 
     const budgetId = access.expense.envelope.budgetId;
+
+    if (goalId) {
+      const goalCheck = await validateGoalForExpense(goalId, budgetId);
+      if (!goalCheck.ok) {
+        return NextResponse.json(errorResponse(goalCheck.error), { status: 400 });
+      }
+    }
 
     if (envelopeId && envelopeId !== access.expense.envelopeId) {
       const envelope = await prisma.envelope.findUnique({
@@ -120,6 +129,10 @@ export async function PATCH(
 
     if (envelopeId) {
       updateData.envelopeId = envelopeId;
+    }
+
+    if (goalId !== undefined) {
+      updateData.goalId = goalId;
     }
 
     const newDate = date ? new Date(date) : null;

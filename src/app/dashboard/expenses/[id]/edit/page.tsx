@@ -422,6 +422,13 @@ export default function EditExpensePage({
             </Alert>
           </Stack>
         </Card>
+      ) : expense.goalId ? (
+        <Card withBorder maw={600} id="refunds">
+          <Alert variant="light" color="gray">
+            Goal contributions cannot be refunded. Edit the amount above to correct this
+            entry.
+          </Alert>
+        </Card>
       ) : (
         <RefundSection
           expenseId={expense.id}

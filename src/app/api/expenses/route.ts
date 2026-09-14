@@ -7,6 +7,7 @@ import { createExpenseSchema } from "@/lib/validations";
 import { expenseInclude } from "@/lib/expense-queries";
 import { activeOnly, isArchived } from "@/lib/archive";
 import { normalizeRecurrenceInput } from "@/lib/expense-recurrence";
+import { validateGoalForExpense } from "@/lib/goal-access";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -127,8 +128,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { amount, payee, description, location, date, envelopeId, budgetId, recurrence, recurrenceEndDate } =
-      result.data;
+    const {
+      amount,
+      payee,
+      description,
+      location,
+      date,
+      envelopeId,
+      budgetId,
+      goalId,
+      recurrence,
+      recurrenceEndDate,
+    } = result.data;
 
     const normalizedRecurrence = normalizeRecurrenceInput(recurrence, recurrenceEndDate);
 
@@ -158,6 +169,13 @@ export async function POST(req: NextRequest) {
       const envelope = await checkEnvelopeAccess(envelopeId, session.user.id);
       if (!envelope || envelope.budgetId !== budgetId) {
         return NextResponse.json(errorResponse("Envelope not found"), { status: 404 });
+      }
+    }
+
+    if (goalId) {
+      const goalCheck = await validateGoalForExpense(goalId, budgetId);
+      if (!goalCheck.ok) {
+        return NextResponse.json(errorResponse(goalCheck.error), { status: 400 });
       }
     }
 
@@ -192,6 +210,7 @@ export async function POST(req: NextRequest) {
         recurrenceEndDate: normalizedRecurrence.recurrenceEndDate,
         payeeId: payeeRecord.id,
         envelopeId,
+        goalId: goalId ?? null,
         createdById: session.user.id,
       },
       include: expenseInclude,

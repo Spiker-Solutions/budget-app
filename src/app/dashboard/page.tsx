@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Title,
   Text,
@@ -13,8 +13,9 @@ import {
   Skeleton,
   Badge,
   ThemeIcon,
+  Alert,
 } from "@mantine/core";
-import { IconPlus, IconWallet, IconReceipt } from "@tabler/icons-react";
+import { IconPlus, IconWallet, IconReceipt, IconTarget } from "@tabler/icons-react";
 import Link from "next/link";
 import { useBudgetStore } from "@/stores/budgetStore";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
@@ -27,13 +28,24 @@ import { type EnvelopePeriodTotals, resolveEnvelopeAllocation } from "@/lib/budg
 import { useBudgetPeriodView } from "@/hooks/useBudgetPeriodView";
 import { PeriodNavigator } from "@/components/shared/PeriodNavigator";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
+import { useGoalStore } from "@/stores/goalStore";
+import { useGoalProgress } from "@/hooks/useGoalProgress";
+import type { Goal } from "@/types";
+import { RemainderWizardModal } from "@/components/goals/RemainderWizardModal";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const { budgets, isLoading: budgetsLoading } = useBudgetStore();
   const { envelopes, fetchEnvelopes, isLoading: envelopesLoading } = useEnvelopeStore();
   const { expenses, fetchExpenses } = useExpenseStore();
+  const { goals, fetchGoals } = useGoalStore();
   const { currentBudgetId } = useUiStore();
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardBanner, setWizardBanner] = useState(false);
+  const [wizardPeriod, setWizardPeriod] = useState<{ start: string; end: string } | null>(
+    null
+  );
+  const [showPeriodWizardButton, setShowPeriodWizardButton] = useState(false);
 
   const {
     currentBudget,
@@ -50,12 +62,36 @@ export default function DashboardPage() {
     goToPeriodContainingDate,
   } = useBudgetPeriodView(envelopes, expenses);
 
+  const refreshWizardHint = useCallback(async () => {
+    if (!currentBudgetId) return;
+    const qs = referenceDate
+      ? `?referenceDate=${encodeURIComponent(referenceDate.toISOString())}`
+      : "";
+    const res = await fetch(
+      `/api/budgets/${currentBudgetId}/remainder-wizard${qs}`
+    );
+    const json = await res.json();
+    if (json.success && json.data.period) {
+      setWizardPeriod(json.data.period);
+      setWizardBanner(Boolean(json.data.showBanner));
+      setShowPeriodWizardButton(Boolean(json.data.showPeriodButton));
+    } else {
+      setWizardBanner(false);
+      setShowPeriodWizardButton(false);
+    }
+  }, [currentBudgetId, referenceDate]);
+
   useEffect(() => {
     if (currentBudgetId) {
       fetchEnvelopes(currentBudgetId);
       fetchExpenses(undefined, currentBudgetId);
+      fetchGoals(currentBudgetId);
     }
-  }, [currentBudgetId, fetchEnvelopes, fetchExpenses]);
+  }, [currentBudgetId, fetchEnvelopes, fetchExpenses, fetchGoals]);
+
+  useEffect(() => {
+    void refreshWizardHint();
+  }, [refreshWizardHint]);
 
   const totalAllocated = periodTotals?.totalBaseAllocation ?? 0;
 
@@ -166,6 +202,44 @@ export default function DashboardPage() {
         </Group>
       </Group>
 
+      {wizardBanner && (
+        <Alert
+          title="Leftover envelope funds"
+          color="teal"
+          variant="light"
+          withCloseButton
+          onClose={async () => {
+            if (!currentBudgetId || !wizardPeriod) return;
+            await fetch(`/api/budgets/${currentBudgetId}/remainder-wizard`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "dismiss",
+                budgetId: currentBudgetId,
+                periodStart: wizardPeriod.start,
+                periodEnd: wizardPeriod.end,
+              }),
+            });
+            setWizardBanner(false);
+          }}
+        >
+          <Group justify="space-between" wrap="nowrap">
+            <Text size="sm">
+              The last period had unspent envelope funds. Allocate them to savings goals?
+            </Text>
+            <Button size="xs" onClick={() => setWizardOpen(true)}>
+              Open wizard
+            </Button>
+          </Group>
+        </Alert>
+      )}
+
+      {!isCurrentPeriod && showPeriodWizardButton && (
+        <Button variant="light" onClick={() => setWizardOpen(true)}>
+          Allocate remainders for this period
+        </Button>
+      )}
+
       <SimpleGrid cols={{ base: 1, sm: 3 }}>
         <Card withBorder>
           <Text size="sm" c="dimmed" fw={500}>
@@ -225,6 +299,40 @@ export default function DashboardPage() {
           </Text>
         </Card>
       </SimpleGrid>
+
+      <Group justify="space-between" mt="lg">
+        <Title order={3}>Goals</Title>
+        {canManageBudgetSettings && (
+          <Button
+            component={Link}
+            href="/dashboard/goals/new"
+            leftSection={<IconPlus size={18} />}
+            variant="light"
+            size="sm"
+          >
+            Add goal
+          </Button>
+        )}
+      </Group>
+
+      {goals.length === 0 ? (
+        <Card withBorder mb="lg">
+          <Text c="dimmed" size="sm">
+            No goals yet. Create a saving or debt payoff goal to track progress.
+          </Text>
+        </Card>
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} mb="xl">
+          {goals.map((goal) => (
+            <GoalDashboardCard
+              key={goal.id}
+              goal={goal}
+              expenses={expenses.filter((e) => e.goalId === goal.id)}
+              currency={currentBudget.currency}
+            />
+          ))}
+        </SimpleGrid>
+      )}
 
       <Group justify="space-between" mt="lg">
         <Title order={3}>Envelopes</Title>
@@ -361,6 +469,58 @@ export default function DashboardPage() {
           </Text>
         )}
       </Text>
+
+      {currentBudgetId && (
+        <RemainderWizardModal
+          budgetId={currentBudgetId}
+          currency={currentBudget.currency}
+          opened={wizardOpen}
+          onClose={() => setWizardOpen(false)}
+          referenceDateIso={referenceDate.toISOString()}
+          onComplete={() => {
+            fetchExpenses(undefined, currentBudgetId);
+            void refreshWizardHint();
+          }}
+        />
+      )}
     </Stack>
+  );
+}
+
+function GoalDashboardCard({
+  goal,
+  expenses,
+  currency,
+}: {
+  goal: Goal;
+  expenses: Parameters<typeof useGoalProgress>[1];
+  currency: string;
+}) {
+  const { currentAmount, progressPercent, label } = useGoalProgress(goal, expenses, []);
+
+  return (
+    <Card
+      withBorder
+      component={Link}
+      href={`/dashboard/goals/${goal.id}`}
+      style={{ textDecoration: "none", color: "inherit" }}
+    >
+      <Group justify="space-between" mb="xs">
+        <Group gap="xs">
+          <ThemeIcon variant="light" color="teal" size="md">
+            <IconTarget size={16} />
+          </ThemeIcon>
+          <Text fw={500}>{goal.name}</Text>
+        </Group>
+        <Badge color="teal" variant="light">
+          {goal.type === "SAVE" ? "Save" : "Debt"}
+        </Badge>
+      </Group>
+      <Progress value={Math.min(progressPercent, 100)} color="teal" size="lg" mb="xs" />
+      <Text size="sm">
+        {formatCurrency(currentAmount, currency)} {label} /{" "}
+        {formatCurrency(Number(goal.targetAmount), currency)} target
+      </Text>
+    </Card>
   );
 }

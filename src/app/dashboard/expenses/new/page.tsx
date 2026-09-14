@@ -12,6 +12,7 @@ import {
   Group,
   Select,
   Autocomplete,
+  SegmentedControl,
 } from "@mantine/core";
 import { DateField } from "@/components/shared/DateField";
 import { useForm } from "@mantine/form";
@@ -20,6 +21,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AmountInput } from "@/components/shared/AmountInput";
 import { useExpenseStore } from "@/stores/expenseStore";
 import { useEnvelopeStore } from "@/stores/envelopeStore";
+import { useGoalStore } from "@/stores/goalStore";
 import { useUiStore } from "@/stores/uiStore";
 import type { CreateExpenseInput } from "@/types";
 
@@ -36,11 +38,18 @@ function NewExpenseForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const envelopeIdParam = searchParams.get("envelopeId") ?? "";
+  const goalIdParam = searchParams.get("goalId") ?? "";
+  const modeParam = searchParams.get("mode") ?? "";
+  const initialMode = modeParam === "contribution" || goalIdParam ? "contribution" : "expense";
   const [loading, setLoading] = useState(false);
   const [payeeOptions, setPayeeOptions] = useState<string[]>([]);
   const { createExpense, fetchExpenses } = useExpenseStore();
   const { envelopes, fetchEnvelopes } = useEnvelopeStore();
+  const { goals, fetchGoals } = useGoalStore();
   const { currentBudgetId } = useUiStore();
+  const [transactionMode, setTransactionMode] = useState<"expense" | "contribution">(
+    initialMode as "expense" | "contribution"
+  );
   // Tracks which button triggered the submit so we know whether to stay on
   // the page (to add another expense) or navigate away.
   const addAnotherRef = useRef(false);
@@ -48,9 +57,10 @@ function NewExpenseForm() {
   useEffect(() => {
     if (currentBudgetId) {
       fetchEnvelopes(currentBudgetId);
+      fetchGoals(currentBudgetId);
       fetchPayees();
     }
-  }, [currentBudgetId, fetchEnvelopes]);
+  }, [currentBudgetId, fetchEnvelopes, fetchGoals]);
 
   const fetchPayees = async () => {
     if (!currentBudgetId) return;
@@ -68,7 +78,7 @@ function NewExpenseForm() {
     }
   };
 
-  const form = useForm<Omit<CreateExpenseInput, "budgetId">>({
+  const form = useForm<Omit<CreateExpenseInput, "budgetId"> & { goalId?: string }>({
     initialValues: {
       amount: 0,
       payee: "",
@@ -78,11 +88,18 @@ function NewExpenseForm() {
       date: new Date(),
       recurrence: "NONE",
       recurrenceEndDate: null,
+      goalId: goalIdParam,
     },
     validate: {
       amount: (value) => (value <= 0 ? "Amount must be greater than 0" : null),
       payee: (value) => (value.length < 1 ? "Payee is required" : null),
       envelopeId: (value) => (!value || value.length < 1 ? "Envelope is required" : null),
+      goalId: (value, values) => {
+        if (transactionMode === "contribution" && (!value || value.length < 1)) {
+          return "Goal is required for contributions";
+        }
+        return null;
+      },
     },
   });
 
@@ -114,6 +131,7 @@ function NewExpenseForm() {
         ...values,
         budgetId: currentBudgetId,
         envelopeId: values.envelopeId,
+        goalId: transactionMode === "contribution" ? values.goalId : null,
       });
 
       if (expense) {
@@ -174,8 +192,8 @@ function NewExpenseForm() {
 
   return (
     <Stack>
-      <Title order={2}>Add New Expense</Title>
-      <Text c="dimmed">Record a new expense for your budget.</Text>
+      <Title order={2}>Add transaction</Title>
+      <Text c="dimmed">Record spending or a contribution toward a goal.</Text>
 
       <Card withBorder maw={600}>
         <form
@@ -184,6 +202,29 @@ function NewExpenseForm() {
           })}
         >
           <Stack>
+            <SegmentedControl
+              value={transactionMode}
+              onChange={(v) => setTransactionMode(v as "expense" | "contribution")}
+              data={[
+                { label: "Expense", value: "expense" },
+                { label: "Goal contribution", value: "contribution" },
+              ]}
+            />
+
+            {transactionMode === "contribution" && (
+              <Select
+                label="Goal"
+                placeholder="Select a save or debt goal"
+                data={goals.map((g) => ({
+                  value: g.id,
+                  label: `${g.name} (${g.type === "SAVE" ? "Save" : "Debt"})`,
+                }))}
+                required
+                searchable
+                {...form.getInputProps("goalId")}
+              />
+            )}
+
             <AmountInput
               label="Amount"
               placeholder="0.00"
