@@ -31,6 +31,10 @@ import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import { useGoalStore } from "@/stores/goalStore";
 import { useGoalProgress } from "@/hooks/useGoalProgress";
 import type { Goal } from "@/types";
+import {
+  goalProgressBadgeColor,
+  goalProgressBarStyles,
+} from "@/lib/goal-progress-color";
 import { RemainderWizardModal } from "@/components/goals/RemainderWizardModal";
 
 export default function DashboardPage() {
@@ -497,6 +501,8 @@ function GoalDashboardCard({
   currency: string;
 }) {
   const { currentAmount, progressPercent, label } = useGoalProgress(goal, expenses, []);
+  const pct = Math.min(progressPercent, 100);
+  const progressBadgeColor = goalProgressBadgeColor(goal.type, progressPercent);
 
   return (
     <Card
@@ -507,16 +513,26 @@ function GoalDashboardCard({
     >
       <Group justify="space-between" mb="xs">
         <Group gap="xs">
-          <ThemeIcon variant="light" color="teal" size="md">
+          <ThemeIcon variant="light" color={progressBadgeColor} size="md">
             <IconTarget size={16} />
           </ThemeIcon>
           <Text fw={500}>{goal.name}</Text>
         </Group>
-        <Badge color="teal" variant="light">
-          {goal.type === "SAVE" ? "Save" : "Debt"}
-        </Badge>
+        <Group gap={4}>
+          <Badge variant="light" color="gray">
+            {goal.type === "SAVE" ? "Save" : "Debt"}
+          </Badge>
+          <Badge variant="light" color={progressBadgeColor}>
+            {Math.round(pct)}%
+          </Badge>
+        </Group>
       </Group>
-      <Progress value={Math.min(progressPercent, 100)} color="teal" size="lg" mb="xs" />
+      <Progress
+        value={pct}
+        size="lg"
+        mb="xs"
+        styles={goalProgressBarStyles(goal.type, progressPercent)}
+      />
       <Text size="sm">
         {formatCurrency(currentAmount, currency)} {label} /{" "}
         {formatCurrency(Number(goal.targetAmount), currency)} target

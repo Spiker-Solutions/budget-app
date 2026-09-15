@@ -24,6 +24,10 @@ import { useBudgetStore } from "@/stores/budgetStore";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import { formatCurrency } from "@/lib/client-utils";
 import { useGoalProgress } from "@/hooks/useGoalProgress";
+import {
+  goalProgressBadgeColor,
+  goalProgressBarStyles,
+} from "@/lib/goal-progress-color";
 import { AmountInput } from "@/components/shared/AmountInput";
 import type { GoalWithRelations } from "@/types";
 import { canManageBudget, getMembershipRole } from "@/lib/permissions";
@@ -119,12 +123,20 @@ export default function GoalDetailPage() {
                 <Badge variant="light">{isSave ? "Saving" : "Debt payoff"}</Badge>
               </div>
             </Group>
-            <Badge size="xl" color="teal" variant="light">
+            <Badge
+              size="xl"
+              color={goalProgressBadgeColor(goal.type, progressPercent)}
+              variant="light"
+            >
               {Math.round(progressPercent)}%
             </Badge>
           </Group>
           {goal.description && <Text c="dimmed">{goal.description}</Text>}
-          <Progress value={Math.min(progressPercent, 100)} size="xl" color="teal" />
+          <Progress
+            value={Math.min(progressPercent, 100)}
+            size="xl"
+            styles={goalProgressBarStyles(goal.type, progressPercent)}
+          />
           <Group grow>
             <div>
               <Text size="sm" c="dimmed">
