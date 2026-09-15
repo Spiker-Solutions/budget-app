@@ -10,7 +10,11 @@ import {
   Button,
   Group,
   NumberInput,
+  Paper,
+  Divider,
+  Box,
 } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import { notifications } from "@mantine/notifications";
 import { formatCurrency } from "@/lib/client-utils";
 import type { Goal } from "@/types";
@@ -34,6 +38,100 @@ type RowState = {
   amount: number;
 };
 
+const ACTION_OPTIONS = [
+  { value: "keep", label: "Keep in envelope" },
+  { value: "goal", label: "Send to save goal" },
+];
+
+function RemainderWizardRowFields({
+  idx,
+  er,
+  currency,
+  goalOptions,
+  row,
+  onUpdateRow,
+  isMobile,
+}: {
+  idx: number;
+  er: EnvelopeRow;
+  currency: string;
+  goalOptions: { value: string; label: string }[];
+  row: RowState | undefined;
+  onUpdateRow: (idx: number, patch: Partial<RowState>) => void;
+  isMobile: boolean;
+}) {
+  const keepInEnvelope = row?.keepInEnvelope ?? true;
+
+  const actionSelect = (
+    <Select
+      data-testid={`wizard-action-${idx}`}
+      label={isMobile ? "Action" : undefined}
+      data={ACTION_OPTIONS}
+      value={keepInEnvelope ? "keep" : "goal"}
+      onChange={(v) =>
+        onUpdateRow(idx, { keepInEnvelope: v === "keep" })
+      }
+      comboboxProps={{ withinPortal: true }}
+      styles={{ root: { flex: 1, minWidth: isMobile ? undefined : 160 } }}
+    />
+  );
+
+  const goalSelect = (
+    <Select
+      data-testid={`wizard-goal-${idx}`}
+      label={isMobile ? "Save goal" : undefined}
+      placeholder="Choose a goal"
+      data={goalOptions}
+      disabled={keepInEnvelope}
+      value={row?.goalId}
+      onChange={(v) => onUpdateRow(idx, { goalId: v })}
+      comboboxProps={{ withinPortal: true }}
+      styles={{ root: { flex: 1, minWidth: isMobile ? undefined : 180 } }}
+    />
+  );
+
+  const amountInput = (
+    <NumberInput
+      label={isMobile ? "Amount" : undefined}
+      disabled={keepInEnvelope}
+      min={0}
+      max={er.remainingThisPeriod}
+      decimalScale={2}
+      value={row?.amount}
+      onChange={(v) => onUpdateRow(idx, { amount: Number(v) || 0 })}
+      styles={{ root: { flex: 1, minWidth: isMobile ? undefined : 120 } }}
+    />
+  );
+
+  if (isMobile) {
+    return (
+      <Paper withBorder p="md" radius="md">
+        <Stack gap="sm">
+          <Group justify="space-between" align="flex-start" wrap="nowrap">
+            <Text fw={600}>{er.envelopeName}</Text>
+            <Text size="sm" c="dimmed" ta="right">
+              {formatCurrency(er.remainingThisPeriod, currency)} left
+            </Text>
+          </Group>
+          {actionSelect}
+          {goalSelect}
+          {amountInput}
+        </Stack>
+      </Paper>
+    );
+  }
+
+  return (
+    <Table.Tr key={er.envelopeId}>
+      <Table.Td>{er.envelopeName}</Table.Td>
+      <Table.Td>{formatCurrency(er.remainingThisPeriod, currency)}</Table.Td>
+      <Table.Td>{actionSelect}</Table.Td>
+      <Table.Td>{goalSelect}</Table.Td>
+      <Table.Td>{amountInput}</Table.Td>
+    </Table.Tr>
+  );
+}
+
 export function RemainderWizardModal({
   budgetId,
   currency,
@@ -49,6 +147,7 @@ export function RemainderWizardModal({
   referenceDateIso?: string;
   onComplete: () => void;
 }) {
+  const isMobile = useMediaQuery("(max-width: 48em)");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState<WizardData | null>(null);
@@ -84,6 +183,14 @@ export function RemainderWizardModal({
 
   const goalOptions =
     data?.saveGoals.map((g) => ({ value: g.id, label: g.name })) ?? [];
+
+  const updateRow = (idx: number, patch: Partial<RowState>) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...patch };
+      return next;
+    });
+  };
 
   const handleSubmit = async () => {
     if (!data) return;
@@ -128,6 +235,7 @@ export function RemainderWizardModal({
       onClose={onClose}
       title="Allocate period remainders to savings"
       size="lg"
+      fullScreen={Boolean(isMobile)}
     >
       {loading && <Text c="dimmed">Loading…</Text>}
       {!loading && !data && (
@@ -138,85 +246,72 @@ export function RemainderWizardModal({
           <Text size="sm" c="dimmed">
             Contributions count as envelope spending for that period.
           </Text>
-          <Table>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Envelope</Table.Th>
-                <Table.Th>Remaining</Table.Th>
-                <Table.Th>Action</Table.Th>
-                <Table.Th>Save goal</Table.Th>
-                <Table.Th>Amount</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
+
+          {isMobile ? (
+            <Stack gap="md">
               {data.envelopeRows.map((er, idx) => (
-                <Table.Tr key={er.envelopeId}>
-                  <Table.Td>{er.envelopeName}</Table.Td>
-                  <Table.Td>{formatCurrency(er.remainingThisPeriod, currency)}</Table.Td>
-                  <Table.Td>
-                    <Select
-                      data-testid={`wizard-action-${idx}`}
-                      data={[
-                        { value: "keep", label: "Keep in envelope" },
-                        { value: "goal", label: "Send to save goal" },
-                      ]}
-                      value={rows[idx]?.keepInEnvelope ? "keep" : "goal"}
-                      onChange={(v) => {
-                        setRows((prev) => {
-                          const next = [...prev];
-                          next[idx] = {
-                            ...next[idx],
-                            keepInEnvelope: v === "keep",
-                          };
-                          return next;
-                        });
-                      }}
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <Select
-                      data-testid={`wizard-goal-${idx}`}
-                      placeholder="Goal"
-                      data={goalOptions}
-                      disabled={rows[idx]?.keepInEnvelope}
-                      value={rows[idx]?.goalId}
-                      onChange={(v) => {
-                        setRows((prev) => {
-                          const next = [...prev];
-                          next[idx] = { ...next[idx], goalId: v };
-                          return next;
-                        });
-                      }}
-                    />
-                  </Table.Td>
-                  <Table.Td>
-                    <NumberInput
-                      disabled={rows[idx]?.keepInEnvelope}
-                      min={0}
-                      max={er.remainingThisPeriod}
-                      decimalScale={2}
-                      value={rows[idx]?.amount}
-                      onChange={(v) => {
-                        setRows((prev) => {
-                          const next = [...prev];
-                          next[idx] = { ...next[idx], amount: Number(v) || 0 };
-                          return next;
-                        });
-                      }}
-                    />
-                  </Table.Td>
-                </Table.Tr>
+                <RemainderWizardRowFields
+                  key={er.envelopeId}
+                  idx={idx}
+                  er={er}
+                  currency={currency}
+                  goalOptions={goalOptions}
+                  row={rows[idx]}
+                  onUpdateRow={updateRow}
+                  isMobile
+                />
               ))}
-            </Table.Tbody>
-          </Table>
-          <Group justify="flex-end">
-            <Button variant="subtle" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} loading={submitting}>
-              Confirm allocations
-            </Button>
-          </Group>
+            </Stack>
+          ) : (
+            <Box style={{ overflowX: "auto" }}>
+              <Table miw={640}>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Envelope</Table.Th>
+                    <Table.Th>Remaining</Table.Th>
+                    <Table.Th w={180}>Action</Table.Th>
+                    <Table.Th w={200}>Save goal</Table.Th>
+                    <Table.Th w={120}>Amount</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {data.envelopeRows.map((er, idx) => (
+                    <RemainderWizardRowFields
+                      key={er.envelopeId}
+                      idx={idx}
+                      er={er}
+                      currency={currency}
+                      goalOptions={goalOptions}
+                      row={rows[idx]}
+                      onUpdateRow={updateRow}
+                      isMobile={false}
+                    />
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          )}
+
+          <Divider />
+          {isMobile ? (
+            <Stack gap="sm">
+              <Button onClick={handleSubmit} loading={submitting}>
+                Confirm allocations
+              </Button>
+              <Button variant="subtle" onClick={onClose}>
+                Cancel
+              </Button>
+            </Stack>
+          ) : (
+            <Group justify="flex-end" gap="sm">
+              <Button variant="subtle" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleSubmit} loading={submitting}>
+                Confirm allocations
+              </Button>
+            </Group>
+          )}
         </Stack>
       )}
     </Modal>

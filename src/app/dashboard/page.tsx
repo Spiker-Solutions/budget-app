@@ -35,6 +35,7 @@ import { goalProgressFillHex, hexWithAlpha } from "@/lib/goal-progress-color";
 import { GoalProgressBar } from "@/components/goals/GoalProgressBar";
 import { GoalProgressPercentBadge } from "@/components/goals/GoalProgressPercentBadge";
 import { RemainderWizardModal } from "@/components/goals/RemainderWizardModal";
+import { useMediaQuery } from "@mantine/hooks";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -49,6 +50,7 @@ export default function DashboardPage() {
     null
   );
   const [showPeriodWizardButton, setShowPeriodWizardButton] = useState(false);
+  const isMobile = useMediaQuery("(max-width: 48em)");
 
   const {
     currentBudget,
@@ -226,14 +228,25 @@ export default function DashboardPage() {
             setWizardBanner(false);
           }}
         >
-          <Group justify="space-between" wrap="nowrap">
-            <Text size="sm">
-              The last period had unspent envelope funds. Allocate them to savings goals?
-            </Text>
-            <Button size="xs" onClick={() => setWizardOpen(true)}>
-              Open wizard
-            </Button>
-          </Group>
+          {isMobile ? (
+            <Stack gap="sm" align="stretch">
+              <Text size="sm">
+                The last period had unspent envelope funds. Allocate them to savings goals?
+              </Text>
+              <Button size="sm" onClick={() => setWizardOpen(true)}>
+                Open wizard
+              </Button>
+            </Stack>
+          ) : (
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Text size="sm" maw={480}>
+                The last period had unspent envelope funds. Allocate them to savings goals?
+              </Text>
+              <Button size="sm" onClick={() => setWizardOpen(true)}>
+                Open wizard
+              </Button>
+            </Group>
+          )}
         </Alert>
       )}
 
@@ -302,40 +315,6 @@ export default function DashboardPage() {
           </Text>
         </Card>
       </SimpleGrid>
-
-      <Group justify="space-between" mt="lg">
-        <Title order={3}>Goals</Title>
-        {canManageBudgetSettings && (
-          <Button
-            component={Link}
-            href="/dashboard/goals/new"
-            leftSection={<IconPlus size={18} />}
-            variant="light"
-            size="sm"
-          >
-            Add goal
-          </Button>
-        )}
-      </Group>
-
-      {goals.length === 0 ? (
-        <Card withBorder mb="lg">
-          <Text c="dimmed" size="sm">
-            No goals yet. Create a saving or debt payoff goal to track progress.
-          </Text>
-        </Card>
-      ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} mb="xl">
-          {goals.map((goal) => (
-            <GoalDashboardCard
-              key={goal.id}
-              goal={goal}
-              expenses={expenses.filter((e) => e.goalId === goal.id)}
-              currency={currentBudget.currency}
-            />
-          ))}
-        </SimpleGrid>
-      )}
 
       <Group justify="space-between" mt="lg">
         <Title order={3}>Envelopes</Title>
@@ -460,6 +439,40 @@ export default function DashboardPage() {
               </Card>
             );
           })}
+        </SimpleGrid>
+      )}
+
+      <Group justify="space-between" mt="xl">
+        <Title order={3}>Goals</Title>
+        {canManageBudgetSettings && (
+          <Button
+            component={Link}
+            href="/dashboard/goals/new"
+            leftSection={<IconPlus size={18} />}
+            variant="light"
+            size="sm"
+          >
+            Add goal
+          </Button>
+        )}
+      </Group>
+
+      {goals.length === 0 ? (
+        <Card withBorder mb="lg">
+          <Text c="dimmed" size="sm">
+            No goals yet. Create a saving or debt payoff goal to track progress.
+          </Text>
+        </Card>
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} mb="xl">
+          {goals.map((goal) => (
+            <GoalDashboardCard
+              key={goal.id}
+              goal={goal}
+              expenses={expenses.filter((e) => e.goalId === goal.id)}
+              currency={currentBudget.currency}
+            />
+          ))}
         </SimpleGrid>
       )}
 
