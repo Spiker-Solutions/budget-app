@@ -26,7 +26,7 @@ import { formatCurrency } from "@/lib/client-utils";
 import { useGoalProgress } from "@/hooks/useGoalProgress";
 import {
   goalProgressBadgeColor,
-  goalProgressBarStyles,
+  goalProgressBarColor,
 } from "@/lib/goal-progress-color";
 import { AmountInput } from "@/components/shared/AmountInput";
 import type { GoalWithRelations } from "@/types";
@@ -136,7 +136,7 @@ export default function GoalDetailPage() {
           <Progress
             value={Math.min(progressPercent, 100)}
             size="xl"
-            styles={goalProgressBarStyles(goal.type, progressPercent)}
+            color={goalProgressBarColor(goal.type, progressPercent)}
           />
           <Group grow>
             <div>

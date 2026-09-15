@@ -33,7 +33,7 @@ import { useGoalProgress } from "@/hooks/useGoalProgress";
 import type { Goal } from "@/types";
 import {
   goalProgressBadgeColor,
-  goalProgressBarStyles,
+  goalProgressBarColor,
 } from "@/lib/goal-progress-color";
 import { RemainderWizardModal } from "@/components/goals/RemainderWizardModal";
 
@@ -537,7 +537,7 @@ function GoalDashboardCard({
         value={pct}
         size="lg"
         mb="xs"
-        styles={goalProgressBarStyles(goal.type, progressPercent)}
+        color={goalProgressBarColor(goal.type, progressPercent)}
       />
       <Text size="sm">
         {formatCurrency(primaryAmount, currency)} {primaryLabel} /{" "}

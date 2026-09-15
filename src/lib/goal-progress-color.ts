@@ -4,11 +4,13 @@ function clampPercent(percent: number): number {
   return Math.min(100, Math.max(0, percent));
 }
 
-function hslToHex(h: number, s: number, l: number): string {
-  const a = (s * Math.min(l, 1 - l)) / 100;
+function hslToHex(h: number, sPercent: number, lPercent: number): string {
+  const s = sPercent / 100;
+  const l = lPercent / 100;
+  const a = s * Math.min(l, 1 - l);
   const f = (n: number) => {
     const k = (n + h / 30) % 12;
-    const color = l / 100 - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
     return Math.round(255 * color)
       .toString(16)
       .padStart(2, "0");
@@ -71,9 +73,17 @@ export function goalProgressBadgeColor(type: GoalType, percent: number): string 
   return "green";
 }
 
+/** Pass to Mantine `<Progress color={...} />` — hex is supported via getThemeColor. */
+export function goalProgressBarColor(type: GoalType, percent: number): string {
+  return goalProgressHex(type, percent);
+}
+
 export function goalProgressBarStyles(type: GoalType, percent: number) {
   const fill = goalProgressHex(type, percent);
   return {
-    section: { backgroundColor: fill, transition: "background-color 200ms ease" },
+    section: {
+      "--progress-section-color": fill,
+      transition: "background-color 200ms ease",
+    },
   } as const;
 }

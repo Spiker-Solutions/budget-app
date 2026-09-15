@@ -4,7 +4,7 @@ import { Badge, Card, Group, Progress, SimpleGrid, Stack, Text, Title } from "@m
 import type { GoalType } from "@prisma/client";
 import {
   goalProgressBadgeColor,
-  goalProgressBarStyles,
+  goalProgressBarColor,
 } from "@/lib/goal-progress-color";
 import { formatCurrency } from "@/lib/client-utils";
 
@@ -51,7 +51,7 @@ function MockGoalCard({
         value={progressPercent}
         size="lg"
         mb="sm"
-        styles={goalProgressBarStyles(type, progressPercent)}
+        color={goalProgressBarColor(type, progressPercent)}
       />
       <Text size="sm">
         {formatCurrency(primaryAmount, "USD")}{" "}
