@@ -24,8 +24,8 @@ async function main() {
   });
   const page = await context.newPage();
   await login(page);
-  await page.goto(`${BASE}/dashboard/goals/progress-preview`, { waitUntil: "networkidle" });
-  await page.getByText("Goal progress colors (preview)").waitFor({ timeout: 30000 });
+  await page.goto(`${BASE}/dashboard/goals/progress-preview`, { waitUntil: "domcontentloaded" });
+  await page.getByTestId("goal-progress-preview").waitFor({ timeout: 30000 });
   await page.waitForTimeout(500);
 
   await page.screenshot({
