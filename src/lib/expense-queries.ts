@@ -25,6 +25,7 @@ export const refundsForExpense = {
 export const expenseInclude = {
   payee: true,
   envelope: true,
+  goal: true,
   createdBy: { select: userSummarySelect },
   refunds: refundsForExpense,
 } satisfies Prisma.ExpenseInclude;

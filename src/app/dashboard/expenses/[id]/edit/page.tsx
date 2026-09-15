@@ -345,13 +345,19 @@ export default function EditExpensePage({
               {...form.getInputProps("amount")}
             />
 
-            <Autocomplete
-              label="Payee"
-              placeholder="Where did you spend?"
-              required
-              data={payeeOptions}
-              {...form.getInputProps("payee")}
-            />
+            {expense.goalId ? (
+              <Text size="sm" c="dimmed">
+                Payee: {expense.goal?.name ?? expense.payee?.name ?? "Goal"} (from linked goal)
+              </Text>
+            ) : (
+              <Autocomplete
+                label="Payee"
+                placeholder="Where did you spend?"
+                required
+                data={payeeOptions}
+                {...form.getInputProps("payee")}
+              />
+            )}
 
             <Select
               label="Envelope"
@@ -421,6 +427,13 @@ export default function EditExpensePage({
               create a one-time expense if you need to record a refund.
             </Alert>
           </Stack>
+        </Card>
+      ) : expense.goalId ? (
+        <Card withBorder maw={600} id="refunds">
+          <Alert variant="light" color="gray">
+            Goal contributions cannot be refunded. Edit the amount above to correct this
+            entry.
+          </Alert>
         </Card>
       ) : (
         <RefundSection

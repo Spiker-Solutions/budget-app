@@ -7,6 +7,8 @@ import { createExpenseSchema } from "@/lib/validations";
 import { expenseInclude } from "@/lib/expense-queries";
 import { activeOnly, isArchived } from "@/lib/archive";
 import { normalizeRecurrenceInput } from "@/lib/expense-recurrence";
+import { validateGoalForExpense } from "@/lib/goal-access";
+import { findOrCreatePayeeForGoalName } from "@/lib/goal-payee";
 
 async function checkEnvelopeAccess(envelopeId: string, userId: string) {
   const envelope = await prisma.envelope.findUnique({
@@ -127,8 +129,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { amount, payee, description, location, date, envelopeId, budgetId, recurrence, recurrenceEndDate } =
-      result.data;
+    const {
+      amount,
+      payee,
+      description,
+      location,
+      date,
+      envelopeId,
+      budgetId,
+      goalId,
+      recurrence,
+      recurrenceEndDate,
+    } = result.data;
 
     const normalizedRecurrence = normalizeRecurrenceInput(recurrence, recurrenceEndDate);
 
@@ -161,24 +173,42 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const normalizedPayeeName = payee.trim().toLowerCase();
-    let payeeRecord = await prisma.payee.findUnique({
-      where: {
-        budgetId_normalizedName: {
-          budgetId,
-          normalizedName: normalizedPayeeName,
-        },
-      },
-    });
+    let payeeRecord;
 
-    if (!payeeRecord) {
-      payeeRecord = await prisma.payee.create({
-        data: {
-          name: payee.trim(),
-          normalizedName: normalizedPayeeName,
-          budgetId,
+    if (goalId) {
+      const goalCheck = await validateGoalForExpense(goalId, budgetId);
+      if (!goalCheck.ok) {
+        return NextResponse.json(errorResponse(goalCheck.error), { status: 400 });
+      }
+      const goal = await prisma.goal.findUnique({
+        where: { id: goalId },
+        select: { name: true },
+      });
+      if (!goal) {
+        return NextResponse.json(errorResponse("Goal not found"), { status: 404 });
+      }
+      payeeRecord = await findOrCreatePayeeForGoalName(budgetId, goal.name);
+    } else {
+      const payeeName = payee?.trim() ?? "";
+      const normalizedPayeeName = payeeName.toLowerCase();
+      payeeRecord = await prisma.payee.findUnique({
+        where: {
+          budgetId_normalizedName: {
+            budgetId,
+            normalizedName: normalizedPayeeName,
+          },
         },
       });
+
+      if (!payeeRecord) {
+        payeeRecord = await prisma.payee.create({
+          data: {
+            name: payeeName,
+            normalizedName: normalizedPayeeName,
+            budgetId,
+          },
+        });
+      }
     }
 
     const expense = await prisma.expense.create({
@@ -192,6 +222,7 @@ export async function POST(req: NextRequest) {
         recurrenceEndDate: normalizedRecurrence.recurrenceEndDate,
         payeeId: payeeRecord.id,
         envelopeId,
+        goalId: goalId ?? null,
         createdById: session.user.id,
       },
       include: expenseInclude,

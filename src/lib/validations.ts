@@ -68,12 +68,13 @@ export const updateEnvelopeSchema = envelopeSchemaBase
 
 const expenseSchemaBase = z.object({
   amount: z.number().positive("Amount must be positive"),
-  payee: z.string().min(1, "Payee is required"),
+  payee: z.string().max(100).optional(),
   description: z.string().max(500).optional(),
   location: z.string().max(200).optional(),
   date: z.string().or(z.date()).optional(),
   envelopeId: z.string().min(1, "Envelope is required"),
   budgetId: z.string().min(1, "Budget is required"),
+  goalId: z.string().min(1).optional().nullable(),
   recurrence: z
     .enum(["NONE", "DAILY", "WEEKLY", "BIWEEKLY", "MONTHLY", "YEARLY"])
     .default("NONE"),
@@ -102,12 +103,29 @@ function validateRecurrenceEndDate(
   }
 }
 
-export const createExpenseSchema = expenseSchemaBase.superRefine(validateRecurrenceEndDate);
+function validateExpensePayee(
+  data: { payee?: string; goalId?: string | null },
+  ctx: z.RefinementCtx
+) {
+  if (data.goalId) return;
+  if (!data.payee || data.payee.trim().length < 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Payee is required",
+      path: ["payee"],
+    });
+  }
+}
+
+export const createExpenseSchema = expenseSchemaBase
+  .superRefine(validateRecurrenceEndDate)
+  .superRefine(validateExpensePayee);
 
 export const updateExpenseSchema = expenseSchemaBase
   .partial()
   .omit({ budgetId: true })
-  .superRefine(validateRecurrenceEndDate);
+  .superRefine(validateRecurrenceEndDate)
+  .superRefine(validateExpensePayee);
 
 /**
  * A refund has no `date` field: it always inherits the parent expense's date,
@@ -130,4 +148,67 @@ export const createPayeeSchema = z.object({
 export const inviteMemberSchema = z.object({
   email: z.string().email("Invalid email address"),
   role: z.enum(["ADMIN", "USER"]),
+});
+
+export const goalTypeSchema = z.enum(["SAVE", "DEBT"]);
+
+const goalSchemaBase = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  type: goalTypeSchema,
+  description: z.string().max(500).optional(),
+  icon: z.enum(ENVELOPE_ICON_NAMES as [string, ...string[]]).nullable().optional(),
+  color: z.enum([...ENVELOPE_COLORS]).nullable().optional(),
+  startingAmount: z.number().min(0, "Starting amount cannot be negative"),
+  targetAmount: z.number().min(0, "Target cannot be negative"),
+  budgetId: z.string().min(1, "Budget ID is required"),
+});
+
+function validateGoalTargets(
+  data: { type: "SAVE" | "DEBT"; startingAmount: number; targetAmount: number },
+  ctx: z.RefinementCtx
+) {
+  if (data.type === "SAVE" && data.targetAmount <= data.startingAmount) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Save target must be greater than starting saved amount",
+      path: ["targetAmount"],
+    });
+  }
+  if (data.type === "DEBT" && data.targetAmount > data.startingAmount) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Payoff target cannot exceed starting balance owed",
+      path: ["targetAmount"],
+    });
+  }
+}
+
+export const createGoalSchema = goalSchemaBase.superRefine(validateGoalTargets);
+
+export const updateGoalSchema = goalSchemaBase.partial().omit({ budgetId: true, type: true });
+
+export const createGoalChargeSchema = z.object({
+  amount: z.number().positive("Amount must be positive"),
+  date: z.string().or(z.date()).optional(),
+  description: z.string().max(500).optional(),
+});
+
+export const remainderWizardDismissSchema = z.object({
+  budgetId: z.string().min(1),
+  periodStart: z.string().or(z.date()),
+  periodEnd: z.string().or(z.date()),
+});
+
+export const remainderWizardSubmitSchema = z.object({
+  budgetId: z.string().min(1),
+  periodStart: z.string().or(z.date()),
+  periodEnd: z.string().or(z.date()),
+  allocations: z.array(
+    z.object({
+      envelopeId: z.string().min(1),
+      goalId: z.string().min(1).optional(),
+      amount: z.number().min(0),
+      keepInEnvelope: z.boolean(),
+    })
+  ),
 });

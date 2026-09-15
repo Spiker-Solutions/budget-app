@@ -72,6 +72,13 @@ export async function POST(
       );
     }
 
+    if (access.expense.goalId) {
+      return NextResponse.json(
+        errorResponse("Goal contributions cannot be refunded. Edit the contribution amount instead."),
+        { status: 400 }
+      );
+    }
+
     const body = await req.json();
     const result = createRefundSchema.safeParse(body);
 
