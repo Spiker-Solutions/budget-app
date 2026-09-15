@@ -2,10 +2,21 @@ import { useMemo } from "react";
 import type { Goal, GoalCharge } from "@prisma/client";
 import type { ExpenseWithRelations } from "@/types";
 import {
+  computeDebtAmountPaid,
   computeDebtProgress,
   computeGoalCurrentAmount,
   computeSaveProgress,
 } from "@/lib/goal-balances";
+
+export type GoalProgressDisplay = {
+  /** Save: saved total. Debt: remaining owed (internal). */
+  currentAmount: number;
+  progressPercent: number;
+  primaryAmount: number;
+  secondaryAmount: number;
+  primaryLabel: string;
+  secondaryLabel: string;
+};
 
 export function useGoalProgress(
   goal: Pick<Goal, "type" | "startingAmount" | "targetAmount"> | null,
@@ -17,7 +28,10 @@ export function useGoalProgress(
       return {
         currentAmount: 0,
         progressPercent: 0,
-        label: "",
+        primaryAmount: 0,
+        secondaryAmount: 0,
+        primaryLabel: "",
+        secondaryLabel: "",
       };
     }
 
@@ -44,14 +58,22 @@ export function useGoalProgress(
       return {
         currentAmount,
         progressPercent: computeSaveProgress(currentAmount, target),
-        label: "saved",
+        primaryAmount: currentAmount,
+        secondaryAmount: target,
+        primaryLabel: "saved",
+        secondaryLabel: "target",
       };
     }
+
+    const amountPaid = computeDebtAmountPaid(starting, currentAmount);
 
     return {
       currentAmount,
       progressPercent: computeDebtProgress(starting, currentAmount, target),
-      label: "owed",
+      primaryAmount: amountPaid,
+      secondaryAmount: currentAmount,
+      primaryLabel: "paid",
+      secondaryLabel: "owed",
     };
   }, [goal, expenses, charges]);
 }

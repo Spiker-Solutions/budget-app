@@ -500,7 +500,13 @@ function GoalDashboardCard({
   expenses: Parameters<typeof useGoalProgress>[1];
   currency: string;
 }) {
-  const { currentAmount, progressPercent, label } = useGoalProgress(goal, expenses, []);
+  const {
+    progressPercent,
+    primaryAmount,
+    secondaryAmount,
+    primaryLabel,
+    secondaryLabel,
+  } = useGoalProgress(goal, expenses, []);
   const pct = Math.min(progressPercent, 100);
   const progressBadgeColor = goalProgressBadgeColor(goal.type, progressPercent);
 
@@ -534,8 +540,8 @@ function GoalDashboardCard({
         styles={goalProgressBarStyles(goal.type, progressPercent)}
       />
       <Text size="sm">
-        {formatCurrency(currentAmount, currency)} {label} /{" "}
-        {formatCurrency(Number(goal.targetAmount), currency)} target
+        {formatCurrency(primaryAmount, currency)} {primaryLabel} /{" "}
+        {formatCurrency(secondaryAmount, currency)} {secondaryLabel}
       </Text>
     </Card>
   );

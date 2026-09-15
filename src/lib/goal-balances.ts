@@ -54,6 +54,10 @@ export function computeSaveProgress(currentSaved: number, targetAmount: number):
   return Math.min(100, (currentSaved / targetAmount) * 100);
 }
 
+export function computeDebtAmountPaid(startingOwed: number, currentOwed: number): number {
+  return roundMoney(Math.max(0, startingOwed - currentOwed));
+}
+
 export function computeDebtProgress(
   startingOwed: number,
   currentOwed: number,
@@ -61,6 +65,6 @@ export function computeDebtProgress(
 ): number {
   const totalToPay = startingOwed - payoffTarget;
   if (totalToPay <= 0) return currentOwed <= payoffTarget ? 100 : 0;
-  const paidDown = startingOwed - currentOwed;
+  const paidDown = computeDebtAmountPaid(startingOwed, currentOwed);
   return Math.min(100, Math.max(0, (paidDown / totalToPay) * 100));
 }

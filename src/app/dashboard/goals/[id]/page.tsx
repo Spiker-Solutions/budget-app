@@ -48,11 +48,13 @@ export default function GoalDetailPage() {
   const userRole = getMembershipRole(budget?.members, session?.user?.id);
   const canManage = canManageBudget(userRole);
 
-  const { currentAmount, progressPercent, label } = useGoalProgress(
-    goal,
-    goal?.expenses ?? [],
-    goal?.charges ?? []
-  );
+  const {
+    progressPercent,
+    primaryAmount,
+    secondaryAmount,
+    primaryLabel,
+    secondaryLabel,
+  } = useGoalProgress(goal, goal?.expenses ?? [], goal?.charges ?? []);
 
   const chargeForm = useForm({
     initialValues: { amount: 0, description: "" },
@@ -72,7 +74,6 @@ export default function GoalDetailPage() {
   }
 
   const isSave = goal.type === "SAVE";
-  const target = Number(goal.targetAmount);
   const currency = budget?.currency ?? "USD";
 
   const handleCharge = async (values: typeof chargeForm.values) => {
@@ -139,19 +140,19 @@ export default function GoalDetailPage() {
           />
           <Group grow>
             <div>
-              <Text size="sm" c="dimmed">
-                Current {label}
+              <Text size="sm" c="dimmed" tt="capitalize">
+                {primaryLabel}
               </Text>
               <Text size="xl" fw={700}>
-                {formatCurrency(currentAmount, currency)}
+                {formatCurrency(primaryAmount, currency)}
               </Text>
             </div>
             <div>
-              <Text size="sm" c="dimmed">
-                Target
+              <Text size="sm" c="dimmed" tt="capitalize">
+                {secondaryLabel}
               </Text>
               <Text size="xl" fw={700}>
-                {formatCurrency(target, currency)}
+                {formatCurrency(secondaryAmount, currency)}
               </Text>
             </div>
           </Group>
