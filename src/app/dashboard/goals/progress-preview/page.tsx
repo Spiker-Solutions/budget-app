@@ -1,11 +1,10 @@
 "use client";
 
-import { Badge, Card, Group, Progress, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { Badge, Card, Group, SimpleGrid, Stack, Text, Title } from "@mantine/core";
 import type { GoalType } from "@prisma/client";
-import {
-  goalProgressBadgeColor,
-  goalProgressBarColor,
-} from "@/lib/goal-progress-color";
+import { GOAL_PROGRESS_COLOR_STEP_PERCENT } from "@/lib/goal-progress-color";
+import { GoalProgressBar } from "@/components/goals/GoalProgressBar";
+import { GoalProgressPercentBadge } from "@/components/goals/GoalProgressPercentBadge";
 import { formatCurrency } from "@/lib/client-utils";
 
 const PERCENTS = [0, 25, 50, 75, 100] as const;
@@ -32,8 +31,6 @@ function MockGoalCard({
     secondaryAmount = startingOwed - primaryAmount;
   }
 
-  const badgeColor = goalProgressBadgeColor(type, progressPercent);
-
   return (
     <Card withBorder miw={280}>
       <Group justify="space-between" mb="xs">
@@ -42,17 +39,10 @@ function MockGoalCard({
           <Badge variant="light" color="gray">
             {isSave ? "Save" : "Debt"}
           </Badge>
-          <Badge variant="light" color={badgeColor}>
-            {progressPercent}%
-          </Badge>
+          <GoalProgressPercentBadge type={type} percent={progressPercent} />
         </Group>
       </Group>
-      <Progress
-        value={progressPercent}
-        size="lg"
-        mb="sm"
-        color={goalProgressBarColor(type, progressPercent)}
-      />
+      <GoalProgressBar type={type} value={progressPercent} mb="sm" />
       <Text size="sm">
         {formatCurrency(primaryAmount, "USD")}{" "}
         {isSave ? "saved" : "paid"} / {formatCurrency(secondaryAmount, "USD")}{" "}
@@ -68,7 +58,11 @@ export default function GoalProgressPreviewPage() {
       <Title order={2}>Goal progress colors (preview)</Title>
       <Text c="dimmed" size="sm">
         Save: light fill deepening toward green at 100%. Debt: red → yellow at 50% → green at
-        100%.
+        100%. Fill and badge colors update every {GOAL_PROGRESS_COLOR_STEP_PERCENT}% (change{" "}
+        <Text span ff="monospace" size="sm">
+          GOAL_PROGRESS_COLOR_STEP_PERCENT
+        </Text>{" "}
+        in goal-progress-color.ts to 5 for finer steps).
       </Text>
       {PERCENTS.map((percent) => (
         <Stack key={percent} gap="sm" data-percent={percent}>

@@ -31,10 +31,9 @@ import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import { useGoalStore } from "@/stores/goalStore";
 import { useGoalProgress } from "@/hooks/useGoalProgress";
 import type { Goal } from "@/types";
-import {
-  goalProgressBadgeColor,
-  goalProgressBarColor,
-} from "@/lib/goal-progress-color";
+import { goalProgressFillHex, hexWithAlpha } from "@/lib/goal-progress-color";
+import { GoalProgressBar } from "@/components/goals/GoalProgressBar";
+import { GoalProgressPercentBadge } from "@/components/goals/GoalProgressPercentBadge";
 import { RemainderWizardModal } from "@/components/goals/RemainderWizardModal";
 
 export default function DashboardPage() {
@@ -508,7 +507,7 @@ function GoalDashboardCard({
     secondaryLabel,
   } = useGoalProgress(goal, expenses, []);
   const pct = Math.min(progressPercent, 100);
-  const progressBadgeColor = goalProgressBadgeColor(goal.type, progressPercent);
+  const progressFill = goalProgressFillHex(goal.type, progressPercent);
 
   return (
     <Card
@@ -519,7 +518,16 @@ function GoalDashboardCard({
     >
       <Group justify="space-between" mb="xs">
         <Group gap="xs">
-          <ThemeIcon variant="light" color={progressBadgeColor} size="md">
+          <ThemeIcon
+            variant="light"
+            size="md"
+            styles={{
+              root: {
+                backgroundColor: hexWithAlpha(progressFill, 0.16),
+                color: progressFill,
+              },
+            }}
+          >
             <IconTarget size={16} />
           </ThemeIcon>
           <Text fw={500}>{goal.name}</Text>
@@ -528,17 +536,10 @@ function GoalDashboardCard({
           <Badge variant="light" color="gray">
             {goal.type === "SAVE" ? "Save" : "Debt"}
           </Badge>
-          <Badge variant="light" color={progressBadgeColor}>
-            {Math.round(pct)}%
-          </Badge>
+          <GoalProgressPercentBadge type={goal.type} percent={progressPercent} />
         </Group>
       </Group>
-      <Progress
-        value={pct}
-        size="lg"
-        mb="xs"
-        color={goalProgressBarColor(goal.type, progressPercent)}
-      />
+      <GoalProgressBar type={goal.type} value={pct} mb="xs" />
       <Text size="sm">
         {formatCurrency(primaryAmount, currency)} {primaryLabel} /{" "}
         {formatCurrency(secondaryAmount, currency)} {secondaryLabel}

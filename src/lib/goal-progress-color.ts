@@ -1,7 +1,21 @@
 import type { GoalType } from "@prisma/client";
 
+/** Color updates every N% (5 = finer steps, 10 = coarser). Bar width still uses exact %. */
+export const GOAL_PROGRESS_COLOR_STEP_PERCENT = 10;
+
 function clampPercent(percent: number): number {
   return Math.min(100, Math.max(0, percent));
+}
+
+/** Snap progress to the nearest step for fill/badge color only. */
+export function snapGoalProgressForColor(
+  percent: number,
+  step: number = GOAL_PROGRESS_COLOR_STEP_PERCENT
+): number {
+  const p = clampPercent(percent);
+  if (step <= 0) return p;
+  if (p >= 100) return 100;
+  return Math.min(100, Math.round(p / step) * step);
 }
 
 function hslToHex(h: number, sPercent: number, lPercent: number): string {
@@ -20,6 +34,20 @@ function hslToHex(h: number, sPercent: number, lPercent: number): string {
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const normalized = hex.replace("#", "");
+  return {
+    r: parseInt(normalized.slice(0, 2), 16),
+    g: parseInt(normalized.slice(2, 4), 16),
+    b: parseInt(normalized.slice(4, 6), 16),
+  };
+}
+
+export function hexWithAlpha(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 /** Save: light teal-gray → deeper teal → Mantine green at 100%. */
@@ -55,13 +83,37 @@ export function debtGoalProgressHex(percent: number): string {
   return hslToHex(h, s, l);
 }
 
-export function goalProgressHex(type: GoalType, percent: number): string {
-  return type === "SAVE" ? saveGoalProgressHex(percent) : debtGoalProgressHex(percent);
+export function goalProgressHex(
+  type: GoalType,
+  percent: number,
+  options?: { step?: number; snap?: boolean }
+): string {
+  const step = options?.step ?? GOAL_PROGRESS_COLOR_STEP_PERCENT;
+  const snap = options?.snap ?? true;
+  const p = snap ? snapGoalProgressForColor(percent, step) : clampPercent(percent);
+  return type === "SAVE" ? saveGoalProgressHex(p) : debtGoalProgressHex(p);
 }
 
-/** Mantine badge color (approximate) for percent pill. */
+/** Fill color for progress bar (stepped by default). */
+export function goalProgressFillHex(type: GoalType, percent: number): string {
+  return goalProgressHex(type, percent);
+}
+
+/** Mantine Badge `styles` using the same stepped hex as the bar. */
+export function goalProgressBadgeStyles(type: GoalType, percent: number) {
+  const hex = goalProgressFillHex(type, percent);
+  return {
+    root: {
+      backgroundColor: hexWithAlpha(hex, 0.16),
+      color: hex,
+      border: `1px solid ${hexWithAlpha(hex, 0.38)}`,
+    },
+  } as const;
+}
+
+/** @deprecated Use goalProgressBadgeStyles — kept for ThemeIcon approximate hues. */
 export function goalProgressBadgeColor(type: GoalType, percent: number): string {
-  const p = clampPercent(percent);
+  const p = snapGoalProgressForColor(percent);
   if (p >= 100) return "green";
   if (type === "DEBT") {
     if (p < 35) return "red";
@@ -71,19 +123,4 @@ export function goalProgressBadgeColor(type: GoalType, percent: number): string 
   if (p < 40) return "gray";
   if (p < 75) return "teal";
   return "green";
-}
-
-/** Pass to Mantine `<Progress color={...} />` — hex is supported via getThemeColor. */
-export function goalProgressBarColor(type: GoalType, percent: number): string {
-  return goalProgressHex(type, percent);
-}
-
-export function goalProgressBarStyles(type: GoalType, percent: number) {
-  const fill = goalProgressHex(type, percent);
-  return {
-    section: {
-      "--progress-section-color": fill,
-      transition: "background-color 200ms ease",
-    },
-  } as const;
 }

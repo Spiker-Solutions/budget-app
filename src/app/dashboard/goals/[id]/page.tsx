@@ -8,7 +8,6 @@ import {
   Stack,
   Group,
   Button,
-  Progress,
   Badge,
   Table,
   Skeleton,
@@ -24,10 +23,8 @@ import { useBudgetStore } from "@/stores/budgetStore";
 import { EnvelopeIcon } from "@/components/envelopes/EnvelopeIcon";
 import { formatCurrency } from "@/lib/client-utils";
 import { useGoalProgress } from "@/hooks/useGoalProgress";
-import {
-  goalProgressBadgeColor,
-  goalProgressBarColor,
-} from "@/lib/goal-progress-color";
+import { GoalProgressBar } from "@/components/goals/GoalProgressBar";
+import { GoalProgressPercentBadge } from "@/components/goals/GoalProgressPercentBadge";
 import { AmountInput } from "@/components/shared/AmountInput";
 import type { GoalWithRelations } from "@/types";
 import { canManageBudget, getMembershipRole } from "@/lib/permissions";
@@ -124,20 +121,14 @@ export default function GoalDetailPage() {
                 <Badge variant="light">{isSave ? "Saving" : "Debt payoff"}</Badge>
               </div>
             </Group>
-            <Badge
+            <GoalProgressPercentBadge
+              type={goal.type}
+              percent={progressPercent}
               size="xl"
-              color={goalProgressBadgeColor(goal.type, progressPercent)}
-              variant="light"
-            >
-              {Math.round(progressPercent)}%
-            </Badge>
+            />
           </Group>
           {goal.description && <Text c="dimmed">{goal.description}</Text>}
-          <Progress
-            value={Math.min(progressPercent, 100)}
-            size="xl"
-            color={goalProgressBarColor(goal.type, progressPercent)}
-          />
+          <GoalProgressBar type={goal.type} value={progressPercent} size="xl" />
           <Group grow>
             <div>
               <Text size="sm" c="dimmed" tt="capitalize">
